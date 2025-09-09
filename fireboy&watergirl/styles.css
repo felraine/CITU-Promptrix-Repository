@@ -1,0 +1,16 @@
+html, body {
+  height: 100%;
+  background: #0f172a; /* slate-900 */
+  overscroll-behavior: none; /* prevent arrow/WASD scrolling */
+}
+
+canvas {
+  background: #1e293b; /* slate-800 */
+  display: block;
+  margin: 0 auto;
+  border-radius: 0.75rem;
+}
+
+.pixel {
+  image-rendering: pixelated;
+}

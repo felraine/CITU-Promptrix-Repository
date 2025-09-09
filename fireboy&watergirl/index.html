@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fireboy & Watergirl — Tethered (Vanilla JS)</title>
+
+  <!-- TailwindCSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Our custom CSS -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="text-slate-100">
+  <div class="max-w-5xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between mb-3">
+      <h1 class="text-xl font-bold tracking-wide">Forest Temple — Tethered (Vanilla JS)</h1>
+      <div class="flex items-center gap-2">
+        <button id="btnReset" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600">Reset</button>
+        <button id="btnPause" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600">Pause</button>
+      </div>
+    </header>
+
+    <section class="grid md:grid-cols-[1fr_auto] gap-4 items-start">
+      <div>
+        <canvas id="game" width="960" height="560" aria-label="Game canvas"></canvas>
+        <p class="mt-2 text-sm text-slate-300">
+          🔴 Fireboy: Arrow keys (← → move, ↑ jump) &nbsp;|&nbsp; 🔵 Watergirl: WASD (A/D move, W jump)
+        </p>
+        <p class="mt-1 text-xs text-slate-400">
+          ⛓️ Tether: You’re chained together (max length shown as a line). Cooperate! Beware the rising murky water.
+        </p>
+      </div>
+      <aside class="w-full md:w-60 bg-slate-800/60 rounded-xl p-4">
+        <h2 class="font-semibold mb-2">HUD</h2>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span>Level</span><span id="hudLevel">1-1</span></div>
+          <div class="flex justify-between"><span>Time</span><span id="hudTime">0.0s</span></div>
+          <div class="flex justify-between"><span>Deaths</span><span id="hudDeaths">0</span></div>
+          <div class="flex justify-between"><span>Chain</span><span id="hudChain">0 / 0</span></div>
+        </div>
+        <hr class="my-3 border-slate-700">
+        <h3 class="font-semibold mb-1">Goal</h3>
+        <p class="text-slate-300 text-sm">
+          Get 🔴 into the red exit and 🔵 into the blue exit (both at the top). Press plates to open gates. Don’t over-stretch the chain!
+        </p>
+      </aside>
+    </section>
+
+    <footer class="mt-6 text-xs text-slate-400">
+      Built with HTML5 Canvas + TailwindCSS. No frameworks.
+    </footer>
+  </div>
+
+  <!-- Our JS -->
+  <script src="game.js"></script>
+</body>
+</html>
