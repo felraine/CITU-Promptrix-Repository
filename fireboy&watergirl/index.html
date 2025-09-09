@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Forest Temple — Duo (Vanilla JS)</title>
+  <title>Bisaya Boy & Tagalog Girl: Baha Escape (Vanilla JS)</title>
 
   <!-- TailwindCSS (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -15,7 +15,7 @@
   <!-- FIXED TOP HUD BAR (exact height = 48px to match CSS/JS) -->
   <header id="hudBar" class="fixed top-0 inset-x-0 z-40 h-12 bg-slate-900/90 backdrop-blur border-b border-slate-800">
     <div class="h-full max-w-screen-2xl mx-auto px-4 flex items-center gap-4">
-      <h1 class="font-semibold tracking-wide">Forest Temple — Duo</h1>
+      <h1 class="font-semibold tracking-wide">Bisaya Boy & Tagalog Girl: Baha Escape</h1>
       <div class="ml-auto flex items-center gap-4 text-sm">
         <div class="flex items-center gap-2"><span class="text-slate-400">Level</span><span id="hudLevel" class="font-semibold">1-1</span></div>
         <div class="flex items-center gap-2"><span class="text-slate-400">Time</span><span id="hudTime" class="font-semibold">0.0s</span></div>
@@ -34,7 +34,7 @@
       <!-- START SCREEN -->
       <div id="startScreen" class="overlay">
         <div class="popup">
-          <h2 class="text-xl font-semibold mb-2">Forest Temple — Duo</h2>
+          <h2 class="text-xl font-semibold mb-2">Bisaya Boy & Tagalog Girl: Baha Escape</h2>
           <p class="text-slate-300 mb-4">Two-player puzzle platformer. Work together to reach your exits.</p>
           <button id="btnStart" class="btn">Start Game</button>
         </div>
@@ -67,18 +67,21 @@
         </div>
       </div>
 
-      <!-- DEATH / RESTART POPUP -->
-      <div id="deathPopup" class="overlay" style="display:none">
-        <div class="popup">
-          <h2 class="text-xl font-semibold mb-2">You Died</h2>
-          <p class="text-slate-300 mb-4">Try again from the start of the level.</p>
+    <!-- DEATH / RESTART POPUP -->
+    <div id="deathPopup" class="overlay" style="display:none">
+      <div class="popup">
+        <h2 class="text-xl font-semibold mb-2">You Died</h2>
+        <p class="text-slate-300 mb-4">Try again from the start of the level.</p>
 
-          <div class="flex gap-3 justify-center">
-            <!-- This ID is already wired in game.js -->
-            <button id="btnRestart" class="btn">Restart</button>
-          </div>
+        <div class="flex gap-3 justify-center">
+          <!-- This ID is already wired in game.js -->
+          <button id="btnRestart" class="btn">Restart</button>
+
+          <!-- Optional: close to keep practicing without restarting -->
+          <button id="btnDeathClose" class="btn bg-slate-600">Close</button>
         </div>
       </div>
+    </div>
 
     </div>
   </main>

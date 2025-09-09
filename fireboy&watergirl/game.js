@@ -20,6 +20,9 @@ const blueWaterImg = new Image(); blueWaterImg.src = './assets/blue_water.png';
 const redWaterImg  = new Image(); redWaterImg.src = './assets/red_water.png';
 const floorImg     = new Image(); floorImg.src = './assets/concrete.png';
 
+let sharedExitHold = 0;       // seconds both are on the purple door
+const SHARED_EXIT_TIME = 3;
+
 // ---------------------------
 // Background Music
 // ---------------------------
@@ -175,6 +178,25 @@ class Platform {
       ctx.fillStyle = '#7b9704';
       ctx.fillRect(this.x, this.y, this.w, this.h);
     }
+
+    // Shared door progress (optional UI)
+    if (level.exits[0]) {
+      const door = level.exits[0];
+      const t = Math.min(sharedExitHold, SHARED_EXIT_TIME);
+      // text
+      ctx.fillStyle = '#e5e7eb';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`Hold: ${t.toFixed(1)} / ${SHARED_EXIT_TIME}s`,
+                  door.x, door.y - 8);
+
+      // tiny progress bar above the door
+      const barW = door.w;
+      const barH = 4;
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(door.x, door.y - 14, barW, barH);
+      ctx.fillStyle = '#a855f7';
+      ctx.fillRect(door.x, door.y - 14, barW * (t / SHARED_EXIT_TIME), barH);
+    }
   }
 }
 
@@ -189,8 +211,9 @@ class Hazard {
 class Plate {
   constructor(x,y,w,h) { this.x=x; this.y=y; this.w=w; this.h=h; this.active=false; }
   rect() { return {x:this.x,y:this.y,w:this.w,h:this.h}; }
-  draw() { ctx.fillStyle = this.active ? '#cfd2da' : '#9ea3b0'; ctx.fillRect(this.x,this.y,this.w,this.h); }
+  draw() { ctx.fillStyle = this.active ? '#1e3a8a' : '#74cfd7ff'; ctx.fillRect(this.x,this.y,this.w,this.h); }
 }
+
 
 class Door {
   constructor(x,y,w,h,color, linkedPlates=[]) {
@@ -213,7 +236,13 @@ class Exit {
   constructor(x,y,w,h, forColor) { this.x=x; this.y=y; this.w=w; this.h=h; this.forColor = forColor; }
   rect() { return {x:this.x,y:this.y,w:this.w,h:this.h}; }
   draw() {
-    ctx.strokeStyle = this.forColor==='red' ? '#ef4444' : '#3b82f6';
+    // red, blue, or purple outline
+    let color = '#a855f7'; // default purple
+    if (this.forColor === 'red')  color = '#ef4444';
+    if (this.forColor === 'blue') color = '#3b82f6';
+    if (this.forColor === 'purple') color = '#a855f7';
+
+    ctx.strokeStyle = color;
     ctx.lineWidth = 3;
     ctx.strokeRect(this.x+1,this.y+1,this.w-2,this.h-2);
   }
@@ -384,8 +413,8 @@ function buildLevel() {
       new Platform(0, MID_Y, Math.floor(w * 0.80), Math.floor(h * 0.075)),
 
       // Colored mid blocks (red/blue)
-      new Platform(Math.floor(w*0.30), MID_Y - Math.floor(h*0.010), Math.floor(w*0.05), Math.floor(h*0.028), 'red'),
-      new Platform(Math.floor(w*0.56), MID_Y - Math.floor(h*0.010), Math.floor(w*0.05), Math.floor(h*0.028), 'blue'),
+      new Platform(Math.floor(w*0.30), MID_Y - Math.floor(h*0.010), Math.floor(w*0.03), Math.floor(h*0.028), 'red'),
+      new Platform(Math.floor(w*0.56), MID_Y - Math.floor(h*0.010), Math.floor(w*0.03), Math.floor(h*0.028), 'blue'),
 
       // Top long platform (leave gap on far right for pillar/exit)
       new Platform(Math.floor(w*0.10), TOP_Y, w - PILLAR_W - Math.floor(w*0.05), Math.floor(h * 0.028)),
@@ -405,9 +434,14 @@ function buildLevel() {
     ],
     doors: [],
     // Exits
+    // Exits (single shared purple door)
     exits: [
-      new Exit(w - PILLAR_W, TOP_Y - Math.floor(h*0.03), 40, 44, 'red'),
-      new Exit(w - Math.floor(PILLAR_W*0.6), TOP_Y - Math.floor(h*0.03), 40, 44, 'blue'),
+      new Exit(
+        w - Math.floor(PILLAR_W*0.6),
+        TOP_Y - Math.floor(h*0.11),
+        40, 44,
+        'purple' // shared door
+      ),
     ],
     // Spawns
     spawns: { fireboy: {x: Math.floor(w*0.05), y: FLOOR_Y - 55}, watergirl: {x: Math.floor(w*0.10), y: FLOOR_Y - 55} },
@@ -751,10 +785,9 @@ function resetRats() {
     new Rat(Math.floor(level.width*0.40), FLOOR_Y - 16, Math.floor(level.width*0.36), Math.floor(level.width*0.52), 1.0),
   ];
 }
-function bothAtExits() {
-  const redExit = level.exits.find(e => e.forColor==='red');
-  const blueExit = level.exits.find(e => e.forColor==='blue');
-  return aabb(fireboy.rect(), redExit) && aabb(watergirl.rect(), blueExit);
+function bothAtSharedExit() {
+  const door = level.exits[0]; // the purple door
+  return aabb(fireboy.rect(), door) && aabb(watergirl.rect(), door);
 }
 
 // ---------------------------
@@ -854,14 +887,23 @@ function tick(ts) {
     // rat patrols
     level.rats.forEach(r => r.update());
 
+    // Shared door hold timer
+    if (running) {
+      if (bothAtSharedExit()) {
+        sharedExitHold = Math.min(SHARED_EXIT_TIME, sharedExitHold + dt);
+      } else {
+        sharedExitHold = 0;
+      }
+    }
+
     // water
     risingWater.update();
   }
 
   draw();
 
-  if (bothAtExits()) {
-    running=false;
+  if (sharedExitHold >= SHARED_EXIT_TIME) {
+    running = false;
     ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,level.width,level.height);
     ctx.fillStyle='#f8fafc'; ctx.font='bold 28px sans-serif';
     const bonus = allColorGemsCollected() ? ' + Gem Master!' : '';
