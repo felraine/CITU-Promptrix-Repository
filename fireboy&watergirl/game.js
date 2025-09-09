@@ -6,6 +6,48 @@ const ctx = canvas.getContext('2d');
 const gameBox = document.getElementById('gameBox');
 const deathPopup   = document.getElementById('deathPopup');
 
+// Rat sprite (URL-encode the "&" as %26)
+const ratImg = new Image();
+ratImg.src = './assets/rat.png';
+ratImg.onload  = () => console.log('rat.png loaded');
+ratImg.onerror = (e) => console.warn('Failed to load rat.png at', ratImg.src, e);
+
+// Sprites
+const bgImg        = new Image(); bgImg.src = './assets/background.png';
+const redPlayerImg = new Image(); redPlayerImg.src = './assets/Tagalog_Girl.gif';
+const bluePlayerImg= new Image(); bluePlayerImg.src = './assets/Bisaya_Boy.gif';
+const blueWaterImg = new Image(); blueWaterImg.src = './assets/blue_water.png';
+const redWaterImg  = new Image(); redWaterImg.src = './assets/red_water.png';
+const floorImg     = new Image(); floorImg.src = './assets/concrete.png';
+
+// ---------------------------
+// Background Music
+// ---------------------------
+const bgMusic = new Audio("assets/bg_music.mp3"); // place your music file in the same folder
+bgMusic.loop = true;
+bgMusic.volume = 0.5; // range: 0.0 (mute) → 1.0 (full)
+
+// helper function to start music safely
+function startMusic() {
+  if (bgMusic.paused) {
+    bgMusic.play().catch(err => {
+      console.log("Autoplay blocked until user interacts:", err);
+    });
+  }
+}
+
+// bind music start to any game-start events
+document.addEventListener("click", startMusic, { once: true });
+document.addEventListener("keydown", startMusic, { once: true });
+
+// optional pause/resume controls
+function pauseMusic() {
+  if (!bgMusic.paused) bgMusic.pause();
+}
+function resumeMusic() {
+  if (bgMusic.paused) startMusic();
+}
+
 // HUD references (top bar)
 const HUD = {
   level: document.getElementById('hudLevel'),
@@ -57,14 +99,14 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 class Player {
   constructor({x, y, color, controls, immune}) {
     this.spawnX = x; this.spawnY = y;
-    this.x = x; this.y = y; this.w = 34; this.h = 44;
+    this.x = x; this.y = y; this.w = 44; this.h = 56;
     this.dx = 0; this.dy = 0;
 
     // Movement tuning
     this.speed = 2.6;
     this.accel = 0.6;
     this.decel = 0.7;
-    this.jumpPower = -11.6;
+    this.jumpPower = -10.5;
     this.maxFall = 11;
     this.gravity = 0.48;
 
@@ -97,10 +139,41 @@ class Platform {
     this.colorTag = colorTag; // 'red', 'blue', or null
   }
   draw() {
-    if (this.colorTag === 'red') ctx.fillStyle = '#b91c1c';
-    else if (this.colorTag === 'blue') ctx.fillStyle = '#1d4ed8';
-    else ctx.fillStyle = '#7b9704';
-    ctx.fillRect(this.x, this.y, this.w, this.h);
+    // Red/Blue special blocks (keep your sprite logic)
+    if (this.colorTag === 'red' && redWaterImg.complete) {
+      ctx.drawImage(redWaterImg, this.x, this.y, this.w, this.h);
+      return;
+    }
+    if (this.colorTag === 'blue' && blueWaterImg.complete) {
+      ctx.drawImage(blueWaterImg, this.x, this.y, this.w, this.h);
+      return;
+    }
+
+    // Floor / default platforms: use a repeating tile
+    if (floorImg.complete) {
+      // Option A: native pattern (simple + fast)
+      const pattern = ctx.createPattern(floorImg, 'repeat');
+      if (pattern && pattern.setTransform) {
+        // Keep the pattern anchored to (0,0) in world space so it doesn't “swim”
+        // by translating the pattern so it starts at this platform's origin.
+        pattern.setTransform(new DOMMatrix().translateSelf(this.x, this.y));
+      }
+
+      const prevSmooth = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = false;  // crisper pixels for small tiles
+
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = pattern || '#7b9704';
+      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.restore();
+
+      ctx.imageSmoothingEnabled = prevSmooth;
+    } else {
+      // Fallback color while the image loads
+      ctx.fillStyle = '#7b9704';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
   }
 }
 
@@ -227,7 +300,7 @@ class MovingPlatform {
     if (this.y >= this.maxY) { this.y = this.maxY; this.dir = -1; }
   }
   draw() {
-    ctx.fillStyle = '#6b7280'; // gray
+    ctx.fillStyle = '#23272a'; // dark gray
     ctx.fillRect(this.x,this.y,this.w,this.h);
   }
 }
@@ -250,11 +323,32 @@ class Rat {
     if (this.x + this.w >= this.right) { this.x = this.right - this.w; this.vx *= -1; }
   }
   draw() {
+  if (ratImg && ratImg.complete && ratImg.naturalWidth > 0) {
+    const prevSmooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false; // crisp pixel look
+
+    ctx.save();
+    // Sprite points LEFT by default:
+    // moving RIGHT → flip; moving LEFT → draw normally
+    if (this.vx > 0) {
+      ctx.translate(this.x + this.w, this.y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(ratImg, 0, 0, this.w, this.h);
+    } else {
+      ctx.drawImage(ratImg, this.x, this.y, this.w, this.h);
+    }
+    ctx.restore();
+
+    ctx.imageSmoothingEnabled = prevSmooth;
+  } else {
+    // Fallback box + “eye”
     ctx.fillStyle = '#2e2e2e';
     ctx.fillRect(this.x, this.y, this.w, this.h);
     ctx.fillStyle = '#f87171';
+    // eye on the *facing* side (right when moving right, left when moving left)
     ctx.fillRect(this.x + (this.vx > 0 ? this.w - 6 : 2), this.y + 4, 4, 4);
   }
+}
 }
 
 // ---------------------------
@@ -293,7 +387,7 @@ function buildLevel() {
       new Platform(Math.floor(w*0.56), MID_Y - Math.floor(h*0.010), Math.floor(w*0.05), Math.floor(h*0.028), 'blue'),
 
       // Top long platform (leave gap on far right for pillar/exit)
-      new Platform(Math.floor(w*0.06), TOP_Y, w - PILLAR_W - Math.floor(w*0.05), Math.floor(h * 0.028)),
+      new Platform(Math.floor(w*0.10), TOP_Y, w - PILLAR_W - Math.floor(w*0.05), Math.floor(h * 0.028)),
 
       // Right vertical pillar rising up (to top/exit)
       pillar,
@@ -315,7 +409,7 @@ function buildLevel() {
       new Exit(w - Math.floor(PILLAR_W*0.6), TOP_Y - Math.floor(h*0.03), 40, 44, 'blue'),
     ],
     // Spawns
-    spawns: { fireboy: {x: Math.floor(w*0.05), y: FLOOR_Y - 44}, watergirl: {x: Math.floor(w*0.10), y: FLOOR_Y - 44} },
+    spawns: { fireboy: {x: Math.floor(w*0.05), y: FLOOR_Y - 55}, watergirl: {x: Math.floor(w*0.10), y: FLOOR_Y - 55} },
 
     // Gems
     gems: [
@@ -329,7 +423,6 @@ function buildLevel() {
 
     // Crates: top lane + bottom-right
     crates: [
-      new Crate(w - PILLAR_W - Math.floor(w*0.09), TOP_Y - 26),
       new Crate(Math.floor(w*0.66), FLOOR_Y - 26),
     ],
 
@@ -342,21 +435,16 @@ function buildLevel() {
     constants: { TOP_Y, MID_Y, FLOOR_Y, FLOOR_H, PILLAR_W },
   };
 
-  // Gates opened by plates (small blockers on each lane)
-  const topGate = new Door(Math.floor(w*0.52), TOP_Y - 100, 18, 100, '#5f7700', [level.plates[0]]);
-  level.doors.push(topGate);
 
 
-// Moving brick near the right pillar entrance
-const brickX = w - Math.floor(PILLAR_W * 1.5);  // a bit left of pillar
-const brickY = MID_Y - 80;                      // starting Y
+// Moving brick on the left side of the level
+const brickX = Math.floor(w * 0.10) - 96 -35; // move 1 inch (96px) to the left
+const brickY = MID_Y - 80;
 const movingBrick = new MovingPlatform(
-  brickX, brickY, 80, 16,                       // size
-  brickY - 60, brickY + 60, 1.2,                // range
-  level.plates                                  // linked to both plates
+  brickX, brickY, 80, 16,            // size
+  brickY - 60, brickY + 60, 1.2,     // range
+  level.plates                       // linked to both plates
 );
-level.movingPlatforms = [movingBrick];
-
 level.movingPlatforms = [movingBrick];
 
 }
@@ -671,8 +759,12 @@ function bothAtExits() {
 // ---------------------------
 function draw() {
   // bg
-  ctx.fillStyle = '#121a0f';
-  ctx.fillRect(0,0,level.width,level.height);
+  if (bgImg.complete) {
+    ctx.drawImage(bgImg, 0, 0, level.width, level.height);
+  } else {
+    ctx.fillStyle = '#121a0f';
+    ctx.fillRect(0,0,level.width,level.height);
+  }
 
   // world
   level.platforms.forEach(p=>p.draw());
@@ -694,8 +786,16 @@ function draw() {
   level.rats.forEach(r => r.draw());
 
   // players
-  ctx.fillStyle = '#ef4444'; ctx.fillRect(fireboy.x, fireboy.y, fireboy.w, fireboy.h);
-  ctx.fillStyle = '#14b8ff'; ctx.fillRect(watergirl.x, watergirl.y, watergirl.w, watergirl.h);
+  if (redPlayerImg.complete) {
+    ctx.drawImage(redPlayerImg, fireboy.x, fireboy.y, fireboy.w, fireboy.h);
+  } else {
+    ctx.fillStyle = '#ef4444'; ctx.fillRect(fireboy.x, fireboy.y, fireboy.w, fireboy.h);
+  }
+  if (bluePlayerImg.complete) {
+    ctx.drawImage(bluePlayerImg, watergirl.x, watergirl.y, watergirl.w, watergirl.h);
+  } else {
+    ctx.fillStyle = '#14b8ff'; ctx.fillRect(watergirl.x, watergirl.y, watergirl.w, watergirl.h);
+  }
 
   // rising water (on top so it covers)
   risingWater.draw();
