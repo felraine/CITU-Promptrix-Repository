@@ -67,11 +67,19 @@
         </div>
       </div>
 
-      <!-- Death / Restart popup -->
-      <div id="deathPopup" class="popup" style="display:none">
-        <div class="popup-card">
-          <h2 style="margin:0 0 12px">You Died!</h2>
-          <button id="btnRestart" class="btn">Restart</button>
+      <!-- DEATH / RESTART POPUP -->
+      <div id="deathPopup" class="overlay" style="display:none">
+        <div class="popup">
+          <h2 class="text-xl font-semibold mb-2">You Died</h2>
+          <p class="text-slate-300 mb-4">Try again from the start of the level.</p>
+
+          <div class="flex gap-3 justify-center">
+            <!-- This ID is already wired in game.js -->
+            <button id="btnRestart" class="btn">Restart</button>
+
+            <!-- Optional: close to keep practicing without restarting -->
+            <button id="btnDeathClose" class="btn bg-slate-600">Close</button>
+          </div>
         </div>
       </div>
 

@@ -263,8 +263,9 @@ function buildLevel() {
       // Middle long platform
       new Platform(0, MID_Y, Math.floor(w * 0.80), Math.floor(h * 0.075)),
 
-      new Platform(Math.floor(w*0.48), MID_Y - Math.floor(h*0.020), Math.floor(w*0.05), Math.floor(h*0.028), 'red'),
-      new Platform(Math.floor(w*0.56), MID_Y - Math.floor(h*0.028), Math.floor(w*0.05), Math.floor(h*0.028), 'blue'),
+      // Colored mid blocks (red/blue)
+      new Platform(Math.floor(w*0.30), MID_Y - Math.floor(h*0.010), Math.floor(w*0.05), Math.floor(h*0.028), 'red'),
+      new Platform(Math.floor(w*0.56), MID_Y - Math.floor(h*0.010), Math.floor(w*0.05), Math.floor(h*0.028), 'blue'),
 
       // Top long platform (leave gap on far right for pillar/exit)
       new Platform(Math.floor(w*0.06), TOP_Y, w - PILLAR_W - Math.floor(w*0.05), Math.floor(h * 0.028)),
@@ -291,7 +292,7 @@ function buildLevel() {
     // Spawns
     spawns: { fireboy: {x: Math.floor(w*0.05), y: FLOOR_Y - 44}, watergirl: {x: Math.floor(w*0.10), y: FLOOR_Y - 44} },
 
-    // Gems (unchanged)
+    // Gems
     gems: [
       new Gem(Math.floor(w*0.14), TOP_Y - 40, 'blue'),
       new Gem(Math.floor(w*0.50), TOP_Y - 60, 'red'),
@@ -301,7 +302,7 @@ function buildLevel() {
       new Gem(Math.floor(w*0.71), h - FLOOR_H - 70, 'red'),
     ],
 
-    // Crates: top lane + bottom-right (your circled spot)
+    // Crates: top lane + bottom-right
     crates: [
       new Crate(w - PILLAR_W - Math.floor(w*0.09), TOP_Y - 26),
       new Crate(Math.floor(w*0.66), FLOOR_Y - 26),
@@ -317,9 +318,8 @@ function buildLevel() {
   };
 
   // Gates opened by plates (small blockers on each lane)
-  const topGate = new Door(Math.floor(w*0.52), TOP_Y - 30, 18, 30, '#5f7700', [level.plates[0]]);
-  const midGate = new Door(Math.floor(w*0.47), MID_Y - 30, 18, 30, '#5f7700', [level.plates[1]]);
-  level.doors.push(topGate, midGate);
+  const topGate = new Door(Math.floor(w*0.52), TOP_Y - 100, 18, 100, '#5f7700', [level.plates[0]]);
+  level.doors.push(topGate);
 }
 
 buildLevel();
@@ -392,15 +392,25 @@ function integratePlayer(p, dt) {
   // horizontal
   p.x += p.dx;
 
-  // collide X with platforms (respect color) and doors
+  // collide X with platforms (color rules) and doors
   for (const pf of level.platforms) {
-    if (pf.forColor && pf.forColor !== p.color) continue; // <-- color lock
-    if (aabb(p.rect(), pf)) {
-      if (p.dx > 0) p.x = pf.x - p.w;
-      else if (p.dx < 0) p.x = pf.x + pf.w;
-      p.dx = 0;
+    if (!aabb(p.rect(), pf)) continue;
+
+    if (pf.colorTag) {
+      // death if wrong color touches
+      if (p.color === 'red' && pf.colorTag === 'blue') { kill(p); return; }
+      if (p.color === 'blue' && pf.colorTag === 'red') { kill(p); return; }
+      // same color = pass-through
+      if (pf.colorTag === p.color) continue;
     }
+
+    // normal collision
+    if (p.dx > 0) p.x = pf.x - p.w;
+    else if (p.dx < 0) p.x = pf.x + pf.w;
+    p.dx = 0;
   }
+
+  // collide X with doors
   for (const d of level.doors) if (d.isSolid() && aabb(p.rect(), d)) {
     if (p.dx > 0) p.x = d.x - p.w;
     else if (p.dx < 0) p.x = d.x + d.w;
@@ -447,14 +457,23 @@ function integratePlayer(p, dt) {
   p.y += p.dy;
   p.onGround = false;
 
-  // collide Y with platforms (respect color) and doors
+  // collide Y with platforms (color rules) and doors
   for (const pf of level.platforms) {
-    if (pf.forColor && pf.forColor !== p.color) continue; // <-- color lock
-    if (aabb(p.rect(), pf)) {
-      if (p.dy > 0) { p.y = pf.y - p.h; p.dy = 0; p.onGround = true; }
-      else if (p.dy < 0) { p.y = pf.y + pf.h; p.dy = 0; }
+    if (!aabb(p.rect(), pf)) continue;
+
+    if (pf.colorTag) {
+      // death if wrong color touches
+      if (p.color === 'red' && pf.colorTag === 'blue') { kill(p); return; }
+      if (p.color === 'blue' && pf.colorTag === 'red') { kill(p); return; }
+      // same color = pass-through
+      if (pf.colorTag === p.color) continue;
     }
+
+    if (p.dy > 0) { p.y = pf.y - p.h; p.dy = 0; p.onGround = true; }
+    else if (p.dy < 0) { p.y = pf.y + pf.h; p.dy = 0; }
   }
+
+  // collide Y with doors
   for (const d of level.doors) if (d.isSolid() && aabb(p.rect(), d)) {
     if (p.dy > 0) { p.y = d.y - p.h; p.dy = 0; p.onGround = true; }
     else if (p.dy < 0) { p.y = d.y + d.h; p.dy = 0; }
@@ -481,7 +500,7 @@ function integratePlayer(p, dt) {
 
 // crate world collision helpers
 function crateCollidesWorld(c) {
-  for (const pf of level.platforms) if (aabb(c, pf)) return true;
+  for (const pf of level.platforms) if (aabb(c, pf)) return true; // crates collide with all platforms
   for (const d of level.doors) if (d.isSolid() && aabb(c, d)) return true;
   if (c.x < 0 || c.x + c.w > level.width) return true;
   return false;
@@ -697,6 +716,10 @@ document.getElementById('btnRestart')?.addEventListener('click', () => {
   resetDynamicLevelObjects();  // recreates the crates
   resetRats();
   running = true;
+});
+document.getElementById('btnDeathClose')?.addEventListener('click', () => {
+  deathPopup.style.display = 'none';
+  running = true; // resume if you want continuing after closing
 });
 
 // ---------------------------
