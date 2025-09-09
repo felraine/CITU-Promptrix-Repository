@@ -106,9 +106,10 @@ class Player {
     this.speed = 2.6;
     this.accel = 0.6;
     this.decel = 0.7;
-    this.jumpPower = -10.5;
+    this.jumpPower = -15;
     this.maxFall = 11;
     this.gravity = 0.48;
+    this.facing = 'right';
 
     // platforming QoL
     this.coyoteMax = 0.10;
@@ -483,6 +484,8 @@ let running = false; // start only after popups
 function applyControls(p, dt) {
   const {left,right,jump} = p.controls;
 
+  if (keys[left] && !keys[right]) p.facing = 'left';
+  else if (keys[right] && !keys[left]) p.facing = 'right';
   // Horizontal input with accel/decel
   const moveDir = (keys[left] ? -1 : 0) + (keys[right] ? 1 : 0);
   if (moveDir !== 0) {
@@ -757,6 +760,33 @@ function bothAtExits() {
 // ---------------------------
 // Render
 // ---------------------------
+function drawPlayer(p, img, fallbackColor) {
+  const { x, y, w, h, facing } = p;
+
+  if (img && img.complete) {
+    const prevSmooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false; // keep pixels crisp
+
+    ctx.save();
+    // Assume the GIF faces RIGHT by default.
+    // Face left? Flip around the player's box.
+    if (facing === 'left') {
+      ctx.translate(x + w, y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, w, h);
+    } else {
+      ctx.drawImage(img, x, y, w, h);
+    }
+    ctx.restore();
+
+    ctx.imageSmoothingEnabled = prevSmooth;
+  } else {
+    ctx.fillStyle = fallbackColor;
+    ctx.fillRect(x, y, w, h);
+  }
+}
+
+
 function draw() {
   // bg
   if (bgImg.complete) {
@@ -786,16 +816,8 @@ function draw() {
   level.rats.forEach(r => r.draw());
 
   // players
-  if (redPlayerImg.complete) {
-    ctx.drawImage(redPlayerImg, fireboy.x, fireboy.y, fireboy.w, fireboy.h);
-  } else {
-    ctx.fillStyle = '#ef4444'; ctx.fillRect(fireboy.x, fireboy.y, fireboy.w, fireboy.h);
-  }
-  if (bluePlayerImg.complete) {
-    ctx.drawImage(bluePlayerImg, watergirl.x, watergirl.y, watergirl.w, watergirl.h);
-  } else {
-    ctx.fillStyle = '#14b8ff'; ctx.fillRect(watergirl.x, watergirl.y, watergirl.w, watergirl.h);
-  }
+  drawPlayer(fireboy,  redPlayerImg,  '#ef4444');
+  drawPlayer(watergirl, bluePlayerImg, '#14b8ff');
 
   // rising water (on top so it covers)
   risingWater.draw();
