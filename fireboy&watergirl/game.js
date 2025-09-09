@@ -21,7 +21,7 @@ const HUD = {
   chain: document.getElementById('hudChain'),
 };
 
-// Start flow popups (these IDs must exist in index.html)
+// Start flow popups
 const startScreen   = document.getElementById('startScreen');
 const controlsPopup = document.getElementById('controlsPopup');
 const goalPopup     = document.getElementById('goalPopup');
@@ -70,7 +70,7 @@ class Player {
     this.maxFall = 11;
     this.gravity = 0.48;
 
-    // QoL for platforming
+    // platforming QoL
     this.coyoteMax = 0.10;
     this.bufferMax = 0.12;
     this.coyote = 0;
@@ -95,7 +95,7 @@ class Player {
 
 class Platform {
   constructor(x,y,w,h) { this.x=x; this.y=y; this.w=w; this.h=h; }
-  draw() { ctx.fillStyle = '#3f3f46'; ctx.fillRect(this.x,this.y,this.w,this.h); }
+  draw() { ctx.fillStyle = '#7b9704'; ctx.fillRect(this.x,this.y,this.w,this.h); }
 }
 
 class Hazard {
@@ -109,7 +109,7 @@ class Hazard {
 class Plate {
   constructor(x,y,w,h) { this.x=x; this.y=y; this.w=w; this.h=h; this.active=false; }
   rect() { return {x:this.x,y:this.y,w:this.w,h:this.h}; }
-  draw() { ctx.fillStyle = this.active ? '#f59e0b' : '#a3a3a3'; ctx.fillRect(this.x,this.y,this.w,this.h); }
+  draw() { ctx.fillStyle = this.active ? '#cfd2da' : '#9ea3b0'; ctx.fillRect(this.x,this.y,this.w,this.h); }
 }
 
 class Door {
@@ -141,15 +141,18 @@ class Exit {
 
 // Rising water (murky)
 class RisingWater {
-  constructor(speed, color='#14532d') {
+  constructor(speed, color='#275a2d') {
     this.level = canvas.height; // starts below screen
-    this.speed = speed; // pixels per frame
+    this.speed = speed; // px/frame
     this.color = color;
   }
   update() { if (running) this.level = Math.max(0, this.level - this.speed); }
   draw() {
     ctx.fillStyle = this.color;
     ctx.fillRect(0, this.level, canvas.width, canvas.height - this.level);
+    ctx.strokeStyle = '#214d27';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, this.level, canvas.width, canvas.height - this.level);
   }
   collides(p) { return p.y + p.h > this.level; }
 }
@@ -168,11 +171,9 @@ class Gem {
     ctx.save();
     ctx.translate(this.x + this.w/2, this.y + this.h/2);
     ctx.rotate(Math.PI/4);
-    ctx.fillStyle = this.color==='red' ? '#ef4444' : '#3b82f6';
+    ctx.fillStyle = this.color==='red' ? '#ff3b3b' : '#14b8ff';
     ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
     ctx.restore();
-
-    // subtle outline
     ctx.save();
     ctx.translate(this.x + this.w/2, this.y + this.h/2);
     ctx.rotate(Math.PI/4);
@@ -195,65 +196,121 @@ class Crate {
   }
   rect() { return {x:this.x, y:this.y, w:this.w, h:this.h}; }
   draw() {
-    ctx.fillStyle = '#8b5cf6'; // violet-ish box
+    ctx.fillStyle = '#7c5cff';
     ctx.fillRect(this.x, this.y, this.w, this.h);
     ctx.strokeStyle = '#a78bfa';
     ctx.strokeRect(this.x+1, this.y+1, this.w-2, this.h-2);
   }
 }
 
+// Rat (patrolling hazard)
+class Rat {
+  constructor(x, y, left, right, speed = 1.1) {
+    this.x = x; this.y = y;
+    this.w = 28; this.h = 16;
+    this.left = Math.min(left, right);
+    this.right = Math.max(left, right);
+    this.vx = Math.abs(speed);
+  }
+  rect() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
+  update() {
+    this.x += this.vx;
+    if (this.x <= this.left) { this.x = this.left; this.vx *= -1; }
+    if (this.x + this.w >= this.right) { this.x = this.right - this.w; this.vx *= -1; }
+  }
+  draw() {
+    ctx.fillStyle = '#2e2e2e';
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+    ctx.fillStyle = '#f87171';
+    ctx.fillRect(this.x + (this.vx > 0 ? this.w - 6 : 2), this.y + 4, 4, 4);
+  }
+}
+
 // ---------------------------
-// Level Definition (made responsive to canvas size)
+// Level Definition (shaped to your mock)
 // ---------------------------
+const h = canvas.height;
+const w = canvas.width;
+
+// y positions for lanes
+const TOP_Y   = 350;
+const MID_Y   = h - 200;
+const FLOOR_Y = h - 40;
+
+// right vertical pillar that connects up to exits
+const PILLAR_W = 120;
+const pillar = new Platform(w - 120, h - 150, PILLAR_W, 180);
+
 const level = {
   id: '1-1',
-  width: canvas.width,
-  height: canvas.height,
+  width: w,
+  height: h,
   gravity: 0.48,
   platforms: [
-    // Floor (sticks to bottom / full width)
-    new Platform(0, canvas.height - 40, canvas.width, 40),
+    // Bottom solid block (floor)
+    new Platform(0, FLOOR_Y, w - 0, 40),
 
-    // Ascent with staggered jumps and a side puzzle (relative to bottom)
-    new Platform(120, canvas.height - 100, 160, 18),
-    new Platform(360, canvas.height - 150, 160, 18),
-    new Platform(600, canvas.height - 200, 160, 18),
+    // Middle long platform (boy)
+    new Platform(0, MID_Y, w - 250, 22),
 
-    // Plate ledge (activates mid-gate)
-    new Platform(340, canvas.height - 220, 120, 16),
+    // Two small blocks on mid platform (to mark "boy can walk" zone)
+    new Platform(w/2 - 100, MID_Y - 22, 60, 22),
+    new Platform(w/2 + 60,  MID_Y - 22, 60, 22),
 
-    // Upper path after gate
-    new Platform(520, canvas.height - 280, 120, 16),
-    new Platform(680, canvas.height - 340, 120, 16),
+    // Top long platform (girl), leaving gap on far right for pillar/exit
+    new Platform(80, TOP_Y, w - PILLAR_W - 60, 22),
 
-    // Top ledge for exits (near top-right)
-    new Platform(canvas.width - 240, 170, 200, 16),
+    // Right vertical pillar rising up (to top/exit)
+    pillar,
+
+    // Tiny step just under the exits (visual)
+    new Platform(w - 180, TOP_Y - 40, 180, 40),
   ],
   hazards: [],
-  plates: [ new Plate(360, canvas.height - 236, 40, 16) ],
+  // Pressure plates: one on top-left, one on mid-left
+  plates: [
+    new Plate(140, TOP_Y - 6, 50, 6),
+    new Plate(220, MID_Y - 6, 50, 6),
+  ],
   doors: [],
+  // Two exits at top-right sitting on the pillar cap
   exits: [
-    new Exit(canvas.width - 140, 126, 40, 44, 'red'),
-    new Exit(canvas.width - 95,  126, 40, 44, 'blue'),
+    new Exit(w - 120, TOP_Y - 14, 40, 44, 'red'),
+    new Exit(w - 70,  TOP_Y - 14, 40, 44, 'blue'),
   ],
-  spawns: { fireboy: {x: 80, y: canvas.height - 84}, watergirl: {x: 130, y: canvas.height - 84} },
+  // Spawns at bottom-left
+  spawns: { fireboy: {x: 40, y: FLOOR_Y - 44}, watergirl: {x: 90, y: FLOOR_Y - 44} },
+
+  // Gems: top-left blue, top-mid red; mid-air cyan (we use blue gem sprite),
+  // two bottom gems (red & blue) near mid-right; one more red mid-left
   gems: [
-    new Gem(170, canvas.height - 130, 'red'),
-    new Gem(430, canvas.height - 178, 'blue'),
-    new Gem(canvas.width - 225, 195, 'red'),
-    new Gem(canvas.width - 75,  195, 'blue'),
+    new Gem(150, TOP_Y - 40, 'blue'),           // top-left (blue)
+    new Gem(w/2 - 20, TOP_Y - 60, 'red'),       // top-mid (red)
+    new Gem(w/2 + 10, MID_Y - 60, 'blue'),      // mid-air cyan spot
+    new Gem(300, MID_Y - 50, 'red'),            // mid-left (red)
+    new Gem(w - 360, FLOOR_Y - 70, 'blue'),     // low blue
+    new Gem(w - 320, FLOOR_Y - 70, 'red'),      // low red
   ],
+
+  // Crate on top lane near the right before the exits
   crates: [
-    new Crate(300, canvas.height - 66),
-  ]
+    new Crate(w - PILLAR_W - 120, TOP_Y - 26),
+  ],
+
+  // Rats: one on top lane, one on bottom floor
+  rats: [
+    new Rat(w/2 + 60, TOP_Y - 16, w/2 + 20, w - PILLAR_W - 40, 1.1),
+    new Rat(w/2 - 80, FLOOR_Y - 16, w/2 - 120, w/2 + 80, 1.0),
+  ],
 };
 
-// Gate that blocks the route until the plate is pressed
-const puzzleDoor = new Door(500, canvas.height - 300, 40, 60, '#f97316', [level.plates[0]]);
-level.doors.push(puzzleDoor);
+// Gates opened by plates (small blockers on each lane)
+const topGate = new Door(w/2 + 10, TOP_Y - 30, 18, 30, '#5f7700', [level.plates[0]]);
+const midGate = new Door(w/2 - 30, MID_Y - 30, 18, 30, '#5f7700', [level.plates[1]]);
+level.doors.push(topGate, midGate);
 
-// Rising water instance (slow, tense climb)
-const risingWater = new RisingWater(0.25, '#14532d');
+// Rising water
+const risingWater = new RisingWater(0.05);
 
 // ---------------------------
 // Players
@@ -286,7 +343,6 @@ const CHAIN = {
 let deaths = 0;
 let levelTime = 0;
 let running = false; // start only after popups
-let last = performance.now();
 
 // ---------------------------
 // Controls & Physics
@@ -345,7 +401,6 @@ function integratePlayer(p, dt) {
   // interact with crate horizontally (push)
   for (const crate of level.crates) {
     if (aabb(p.rect(), crate)) {
-      // Determine from which side player is pushing
       if (p.dx > 0) {
         const oldX = crate.x;
         crate.x += p.dx * 0.9;
@@ -460,7 +515,6 @@ function currentChainLength() {
   const dx = c2.cx - c1.cx, dy = c2.cy - c1.cy;
   return Math.hypot(dx, dy);
 }
-
 function applyChainConstraint(p1, p2) {
   const c1 = p1.center(), c2 = p2.center();
   let dx = c2.cx - c1.cx, dy = c2.cy - c1.cy;
@@ -480,7 +534,6 @@ function applyChainConstraint(p1, p2) {
   resolveGround(p1);
   resolveGround(p2);
 }
-
 function resolveGround(p) {
   p.onGround = false;
   for (const pf of level.platforms) if (aabb(p.rect(), pf)) {
@@ -488,7 +541,7 @@ function resolveGround(p) {
       p.y = pf.y - p.h; p.dy = 0; p.onGround = true;
     }
   }
-  for (const d of level.doors) if (d.isSolid() && aabb(p.rect(), d)) {
+  for (const d of level.doors) if (aabb(p.rect(), d) && d.isSolid()) {
     if (p.dy >= 0 && p.y + p.h > d.y && p.y < d.y) {
       p.y = d.y - p.h; p.dy = 0; p.onGround = true;
     }
@@ -499,13 +552,11 @@ function resolveGround(p) {
 // Hazards, Gems & Goals
 // ---------------------------
 function checkHazards(p) {
+  // rats
+  for (const r of level.rats) if (aabb(p.rect(), r.rect())) { kill(p); return; }
+  // rising water
   if (risingWater.collides(p)) kill(p);
-  for (const hz of level.hazards) if (aabb(p.rect(), hz)) {
-    const bad = (hz.type==='fire' && !p.immune.fire) ||
-                (hz.type==='water' && !p.immune.water) ||
-                hz.type==='poison';
-    if (bad) kill(p);
-  }
+  // other hazards if you add later
 }
 
 function checkGems(p) {
@@ -528,7 +579,8 @@ function updatePlates() {
   for (const pl of level.plates) {
     pl.active =
       (aabb(fireboy.rect(), pl) && fireboy.y+fireboy.h <= pl.y+pl.h+2) ||
-      (aabb(watergirl.rect(), pl) && watergirl.y+watergirl.h <= pl.y+pl.h+2);
+      (aabb(watergirl.rect(), pl) && watergirl.y+watergirl.h <= pl.y+pl.h+2) ||
+      level.crates.some(c => aabb(c, pl)); // crate can press
   }
 }
 function updateDoors() { for (const d of level.doors) d.update(); }
@@ -538,16 +590,23 @@ function kill(_p) {
   fireboy.reset(); watergirl.reset();
   levelTime = 0;
   risingWater.level = canvas.height;
-  // reset crate & gems
   resetDynamicLevelObjects();
+  resetRats();
 }
 
 function resetDynamicLevelObjects() {
-  // Reset crate(s)
-  level.crates = [ new Crate(300, canvas.height - 66) ];
+  // Reset crate
+  level.crates = [ new Crate(w - PILLAR_W - 120, TOP_Y - 26) ];
   // Reset gems
   level.gems.forEach(g => g.collected = false);
   fireboy.collected = 0; watergirl.collected = 0;
+}
+
+function resetRats() {
+  level.rats = [
+    new Rat(w/2 + 60, TOP_Y - 16, w/2 + 20, w - PILLAR_W - 40, 1.1),
+    new Rat(w/2 - 80, FLOOR_Y - 16, w/2 - 120, w/2 + 80, 1.0),
+  ];
 }
 
 function bothAtExits() {
@@ -560,7 +619,7 @@ function bothAtExits() {
 // Render
 // ---------------------------
 function drawChain() {
-  const f = fireboy.center(), w = watergirl.center();
+  const f = fireboy.center(), w2 = watergirl.center();
   const dist = Math.min(currentChainLength(), CHAIN.maxLength);
   const t = dist / CHAIN.maxLength; // 0..1
   const color = t < 0.66 ? '#d1d5db' : (t < 0.9 ? '#f59e0b' : '#ef4444');
@@ -569,18 +628,17 @@ function drawChain() {
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(f.cx, f.cy);
-  ctx.lineTo(w.cx, w.cy);
+  ctx.lineTo(w2.cx, w2.cy);
   ctx.stroke();
 }
 
 function draw() {
-  // background
-  ctx.fillStyle = '#0b1220';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // bg
+  ctx.fillStyle = '#121a0f';
+  ctx.fillRect(0,0,w,h);
 
   // world
   level.platforms.forEach(p=>p.draw());
-  level.hazards.forEach(h=>h.draw());
   level.plates.forEach(p=>p.draw());
   level.doors.forEach(d=>d.draw());
   level.exits.forEach(e=>e.draw());
@@ -588,20 +646,23 @@ function draw() {
   // gems
   level.gems.forEach(g => g.draw());
 
-  // crate(s)
+  // crate
   level.crates.forEach(c => c.draw());
+
+  // rats
+  level.rats.forEach(r => r.draw());
 
   // chain
   drawChain();
 
   // players
   ctx.fillStyle = '#ef4444'; ctx.fillRect(fireboy.x, fireboy.y, fireboy.w, fireboy.h);
-  ctx.fillStyle = '#3b82f6'; ctx.fillRect(watergirl.x, watergirl.y, watergirl.w, watergirl.h);
+  ctx.fillStyle = '#14b8ff'; ctx.fillRect(watergirl.x, watergirl.y, watergirl.w, watergirl.h);
 
-  // rising water (draw after players so it visually covers them when submerged)
+  // rising water (on top so it covers)
   risingWater.draw();
 
-  // gem HUD overlay
+  // HUD gems
   ctx.fillStyle = '#e5e7eb';
   ctx.font = '12px sans-serif';
   ctx.fillText(`🔴 ${fireboy.collected} | 🔵 ${watergirl.collected}  (Total: ${level.gems.filter(g=>g.collected).length}/${level.gems.length})`, 10, 16);
@@ -610,6 +671,7 @@ function draw() {
 // ---------------------------
 // Game Loop
 // ---------------------------
+let last = performance.now();
 function tick(ts) {
   const dt = (ts-last)/1000; last=ts;
   if (running) levelTime += dt;
@@ -620,17 +682,21 @@ function tick(ts) {
     applyControls(fireboy, dt); applyControls(watergirl, dt);
     integratePlayer(fireboy, dt); integratePlayer(watergirl, dt);
 
-    // After players have potentially shoved the crate, update crate physics
+    // crate physics after possible push
     level.crates.forEach(updateCrate);
 
-    // Tether after integrating both
+    // tether after integrating both
     applyChainConstraint(fireboy, watergirl);
 
-    // Interactions
+    // interactions
     checkGems(fireboy); checkGems(watergirl);
     checkHazards(fireboy); checkHazards(watergirl);
     updatePlates(); updateDoors();
 
+    // rat patrols
+    level.rats.forEach(r => r.update());
+
+    // water
     risingWater.update();
   }
 
@@ -639,10 +705,10 @@ function tick(ts) {
 
   if (bothAtExits()) {
     running=false;
-    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,w,h);
     ctx.fillStyle='#f8fafc'; ctx.font='bold 28px sans-serif';
     const bonus = allColorGemsCollected() ? ' + Gem Master!' : '';
-    ctx.fillText('Level Complete!' + bonus, canvas.width/2-140, canvas.height/2);
+    ctx.fillText('Level Complete!' + bonus, w/2-140, h/2);
   }
   requestAnimationFrame(tick);
 }
@@ -655,6 +721,7 @@ document.getElementById('btnReset').addEventListener('click', ()=>{
   fireboy.reset(); watergirl.reset(); levelTime=0; running=true;
   risingWater.level = canvas.height;
   resetDynamicLevelObjects();
+  resetRats();
 });
 document.getElementById('btnPause').addEventListener('click', (e)=>{
   running=!running; e.currentTarget.textContent=running?'Pause':'Resume';
