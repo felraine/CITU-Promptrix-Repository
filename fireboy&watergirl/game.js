@@ -6,6 +6,13 @@ const ctx = canvas.getContext('2d');
 const gameBox = document.getElementById('gameBox');
 const deathPopup   = document.getElementById('deathPopup');
 
+// Rat sprite (URL-encode the "&" as %26)
+const ratImg = new Image();
+ratImg.src = './assets/rat.png';
+ratImg.onload  = () => console.log('rat.png loaded');
+ratImg.onerror = (e) => console.warn('Failed to load rat.png at', ratImg.src, e);
+
+
 // HUD references (top bar)
 const HUD = {
   level: document.getElementById('hudLevel'),
@@ -225,11 +232,32 @@ class Rat {
     if (this.x + this.w >= this.right) { this.x = this.right - this.w; this.vx *= -1; }
   }
   draw() {
+  if (ratImg && ratImg.complete && ratImg.naturalWidth > 0) {
+    const prevSmooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false; // crisp pixel look
+
+    ctx.save();
+    // Sprite points LEFT by default:
+    // moving RIGHT → flip; moving LEFT → draw normally
+    if (this.vx > 0) {
+      ctx.translate(this.x + this.w, this.y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(ratImg, 0, 0, this.w, this.h);
+    } else {
+      ctx.drawImage(ratImg, this.x, this.y, this.w, this.h);
+    }
+    ctx.restore();
+
+    ctx.imageSmoothingEnabled = prevSmooth;
+  } else {
+    // Fallback box + “eye”
     ctx.fillStyle = '#2e2e2e';
     ctx.fillRect(this.x, this.y, this.w, this.h);
     ctx.fillStyle = '#f87171';
+    // eye on the *facing* side (right when moving right, left when moving left)
     ctx.fillRect(this.x + (this.vx > 0 ? this.w - 6 : 2), this.y + 4, 4, 4);
   }
+}
 }
 
 // ---------------------------
@@ -304,7 +332,6 @@ function buildLevel() {
 
     // Crates: top lane + bottom-right
     crates: [
-      new Crate(w - PILLAR_W - Math.floor(w*0.09), TOP_Y - 26),
       new Crate(Math.floor(w*0.66), FLOOR_Y - 26),
     ],
 
@@ -317,9 +344,6 @@ function buildLevel() {
     constants: { TOP_Y, MID_Y, FLOOR_Y, FLOOR_H, PILLAR_W },
   };
 
-  // Gates opened by plates (small blockers on each lane)
-  const topGate = new Door(Math.floor(w*0.52), TOP_Y - 100, 18, 100, '#5f7700', [level.plates[0]]);
-  level.doors.push(topGate);
 }
 
 buildLevel();
