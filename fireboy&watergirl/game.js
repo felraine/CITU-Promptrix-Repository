@@ -12,6 +12,14 @@ ratImg.src = './assets/rat.png';
 ratImg.onload  = () => console.log('rat.png loaded');
 ratImg.onerror = (e) => console.warn('Failed to load rat.png at', ratImg.src, e);
 
+// Sprites
+const bgImg        = new Image(); bgImg.src = './assets/background.png';
+const redPlayerImg = new Image(); redPlayerImg.src = './assets/Tagalog_Girl.gif';
+const bluePlayerImg= new Image(); bluePlayerImg.src = './assets/Bisaya_Boy.gif';
+const blueWaterImg = new Image(); blueWaterImg.src = './assets/blue_water.png';
+const redWaterImg  = new Image(); redWaterImg.src = './assets/red_water.png';
+const floorImg     = new Image(); floorImg.src = './assets/concrete.png';
+
 
 // HUD references (top bar)
 const HUD = {
@@ -64,14 +72,14 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 class Player {
   constructor({x, y, color, controls, immune}) {
     this.spawnX = x; this.spawnY = y;
-    this.x = x; this.y = y; this.w = 34; this.h = 44;
+    this.x = x; this.y = y; this.w = 44; this.h = 56;
     this.dx = 0; this.dy = 0;
 
     // Movement tuning
     this.speed = 2.6;
     this.accel = 0.6;
     this.decel = 0.7;
-    this.jumpPower = -11.6;
+    this.jumpPower = -10.5;
     this.maxFall = 11;
     this.gravity = 0.48;
 
@@ -104,10 +112,41 @@ class Platform {
     this.colorTag = colorTag; // 'red', 'blue', or null
   }
   draw() {
-    if (this.colorTag === 'red') ctx.fillStyle = '#b91c1c';
-    else if (this.colorTag === 'blue') ctx.fillStyle = '#1d4ed8';
-    else ctx.fillStyle = '#7b9704';
-    ctx.fillRect(this.x, this.y, this.w, this.h);
+    // Red/Blue special blocks (keep your sprite logic)
+    if (this.colorTag === 'red' && redWaterImg.complete) {
+      ctx.drawImage(redWaterImg, this.x, this.y, this.w, this.h);
+      return;
+    }
+    if (this.colorTag === 'blue' && blueWaterImg.complete) {
+      ctx.drawImage(blueWaterImg, this.x, this.y, this.w, this.h);
+      return;
+    }
+
+    // Floor / default platforms: use a repeating tile
+    if (floorImg.complete) {
+      // Option A: native pattern (simple + fast)
+      const pattern = ctx.createPattern(floorImg, 'repeat');
+      if (pattern && pattern.setTransform) {
+        // Keep the pattern anchored to (0,0) in world space so it doesn't “swim”
+        // by translating the pattern so it starts at this platform's origin.
+        pattern.setTransform(new DOMMatrix().translateSelf(this.x, this.y));
+      }
+
+      const prevSmooth = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = false;  // crisper pixels for small tiles
+
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = pattern || '#7b9704';
+      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.restore();
+
+      ctx.imageSmoothingEnabled = prevSmooth;
+    } else {
+      // Fallback color while the image loads
+      ctx.fillStyle = '#7b9704';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
   }
 }
 
@@ -318,7 +357,7 @@ function buildLevel() {
       new Exit(w - Math.floor(PILLAR_W*0.6), TOP_Y - Math.floor(h*0.03), 40, 44, 'blue'),
     ],
     // Spawns
-    spawns: { fireboy: {x: Math.floor(w*0.05), y: FLOOR_Y - 44}, watergirl: {x: Math.floor(w*0.10), y: FLOOR_Y - 44} },
+    spawns: { fireboy: {x: Math.floor(w*0.05), y: FLOOR_Y - 55}, watergirl: {x: Math.floor(w*0.10), y: FLOOR_Y - 55} },
 
     // Gems
     gems: [
@@ -633,8 +672,12 @@ function bothAtExits() {
 // ---------------------------
 function draw() {
   // bg
-  ctx.fillStyle = '#121a0f';
-  ctx.fillRect(0,0,level.width,level.height);
+  if (bgImg.complete) {
+    ctx.drawImage(bgImg, 0, 0, level.width, level.height);
+  } else {
+    ctx.fillStyle = '#121a0f';
+    ctx.fillRect(0,0,level.width,level.height);
+  }
 
   // world
   level.platforms.forEach(p=>p.draw());
@@ -652,8 +695,16 @@ function draw() {
   level.rats.forEach(r => r.draw());
 
   // players
-  ctx.fillStyle = '#ef4444'; ctx.fillRect(fireboy.x, fireboy.y, fireboy.w, fireboy.h);
-  ctx.fillStyle = '#14b8ff'; ctx.fillRect(watergirl.x, watergirl.y, watergirl.w, watergirl.h);
+  if (redPlayerImg.complete) {
+    ctx.drawImage(redPlayerImg, fireboy.x, fireboy.y, fireboy.w, fireboy.h);
+  } else {
+    ctx.fillStyle = '#ef4444'; ctx.fillRect(fireboy.x, fireboy.y, fireboy.w, fireboy.h);
+  }
+  if (bluePlayerImg.complete) {
+    ctx.drawImage(bluePlayerImg, watergirl.x, watergirl.y, watergirl.w, watergirl.h);
+  } else {
+    ctx.fillStyle = '#14b8ff'; ctx.fillRect(watergirl.x, watergirl.y, watergirl.w, watergirl.h);
+  }
 
   // rising water (on top so it covers)
   risingWater.draw();
