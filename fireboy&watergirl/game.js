@@ -209,6 +209,31 @@ class Crate {
   }
 }
 
+
+class MovingPlatform {
+  constructor(x, y, w, h, minY, maxY, speed, linkedPlates=[]) {
+    this.x = x; this.y = y; this.w = w; this.h = h;
+    this.minY = minY; this.maxY = maxY;
+    this.speed = speed;
+    this.dir = 1;
+    this.linkedPlates = linkedPlates;
+  }
+  rect() { return {x:this.x, y:this.y, w:this.w, h:this.h}; }
+  update() {
+    const anyActive = this.linkedPlates.some(p => p.active);
+    if (!anyActive) return;
+    this.y += this.speed * this.dir;
+    if (this.y <= this.minY) { this.y = this.minY; this.dir = 1; }
+    if (this.y >= this.maxY) { this.y = this.maxY; this.dir = -1; }
+  }
+  draw() {
+    ctx.fillStyle = '#6b7280'; // gray
+    ctx.fillRect(this.x,this.y,this.w,this.h);
+  }
+}
+
+
+
 // Rat (patrolling hazard)
 class Rat {
   constructor(x, y, left, right, speed = 1.1) {
@@ -242,7 +267,7 @@ function buildLevel() {
   const h = canvas.height;
 
   // y positions for lanes (relative)
-  const TOP_Y   = Math.floor(h * 0.38);
+  const TOP_Y   = Math.floor(h * 0.30);
   const MID_Y   = Math.floor(h * 0.60);
   const FLOOR_H = Math.floor(h * 0.08);
   const FLOOR_Y = h - FLOOR_H;
@@ -320,6 +345,20 @@ function buildLevel() {
   // Gates opened by plates (small blockers on each lane)
   const topGate = new Door(Math.floor(w*0.52), TOP_Y - 100, 18, 100, '#5f7700', [level.plates[0]]);
   level.doors.push(topGate);
+
+
+// Moving brick near the right pillar entrance
+const brickX = w - Math.floor(PILLAR_W * 1.5);  // a bit left of pillar
+const brickY = MID_Y - 80;                      // starting Y
+const movingBrick = new MovingPlatform(
+  brickX, brickY, 80, 16,                       // size
+  brickY - 60, brickY + 60, 1.2,                // range
+  level.plates                                  // linked to both plates
+);
+level.movingPlatforms = [movingBrick];
+
+level.movingPlatforms = [movingBrick];
+
 }
 
 buildLevel();
@@ -496,6 +535,26 @@ function integratePlayer(p, dt) {
 
   // fell far below world (safety)
   if (p.y > level.height + 200) kill(p);
+
+  // --- COLLISION WITH MOVING PLATFORMS (the gray brick) ---
+  for (const mp of level.movingPlatforms || []) {
+    if (aabb(p.rect(), mp)) {
+      // Landing on top of the brick
+      if (p.dy > 0 && p.y + p.h - mp.y <= 16) {
+        p.y = mp.y - p.h;
+        p.dy = 0;
+        p.onGround = true;
+        // carry the player as the brick moves
+        p.x += mp.speed * mp.dir;
+      }
+      // Hitting the brick from below
+      else if (p.dy < 0 && mp.y + mp.h - p.y <= 16) {
+        p.y = mp.y + mp.h;
+        p.dy = 0;
+      }
+      // (Optional) side overlap fallback if needed
+    }
+  }
 }
 
 // crate world collision helpers
@@ -541,6 +600,9 @@ function updateCrate(crate) {
     else if (crate.dy < 0) { crate.y = d.y + d.h; crate.dy = 0; }
   }
 }
+
+
+
 
 // ---------------------------
 // Hazards, Gems & Goals
@@ -618,6 +680,10 @@ function draw() {
   level.doors.forEach(d=>d.draw());
   level.exits.forEach(e=>e.draw());
 
+  // Draw moving brick(s)
+(level.movingPlatforms || []).forEach(mp => mp.draw());
+
+
   // gems
   level.gems.forEach(g => g.draw());
 
@@ -661,6 +727,7 @@ function tick(ts) {
     checkGems(fireboy); checkGems(watergirl);
     checkHazards(fireboy); checkHazards(watergirl);
     updatePlates(); updateDoors();
+    level.movingPlatforms.forEach(mp => mp.update());
 
     // rat patrols
     level.rats.forEach(r => r.update());
