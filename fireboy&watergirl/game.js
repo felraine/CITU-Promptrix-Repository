@@ -1,9 +1,19 @@
 // ---------------------------
-// Setup
+// Setup (Full-screen + Popups flow)
 // ---------------------------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+// Size canvas: full-screen under a ~48px HUD bar
+function sizeCanvas() {
+  const HUD_HEIGHT = 48; // keep in sync with your CSS/top bar height
+  canvas.width = window.innerWidth;
+  canvas.height = Math.max(240, window.innerHeight - HUD_HEIGHT);
+}
+sizeCanvas();
+window.addEventListener('resize', sizeCanvas);
+
+// HUD references (top bar)
 const HUD = {
   level: document.getElementById('hudLevel'),
   time: document.getElementById('hudTime'),
@@ -11,6 +21,25 @@ const HUD = {
   chain: document.getElementById('hudChain'),
 };
 
+// Start flow popups (these IDs must exist in index.html)
+const startScreen   = document.getElementById('startScreen');
+const controlsPopup = document.getElementById('controlsPopup');
+const goalPopup     = document.getElementById('goalPopup');
+
+document.getElementById('btnStart')?.addEventListener('click', () => {
+  startScreen.style.display = 'none';
+  controlsPopup.style.display = 'flex';
+});
+document.getElementById('btnControlsNext')?.addEventListener('click', () => {
+  controlsPopup.style.display = 'none';
+  goalPopup.style.display = 'flex';
+});
+document.getElementById('btnGoalStart')?.addEventListener('click', () => {
+  goalPopup.style.display = 'none';
+  running = true;
+});
+
+// Keyboard
 const keys = {};
 addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
@@ -174,7 +203,7 @@ class Crate {
 }
 
 // ---------------------------
-// Level Definition
+// Level Definition (made responsive to canvas size)
 // ---------------------------
 const level = {
   id: '1-1',
@@ -182,45 +211,45 @@ const level = {
   height: canvas.height,
   gravity: 0.48,
   platforms: [
-    // Floor
-    new Platform(0, 520, 960, 40),
+    // Floor (sticks to bottom / full width)
+    new Platform(0, canvas.height - 40, canvas.width, 40),
 
-    // Ascent with staggered jumps and a side puzzle
-    new Platform(120, 460, 160, 18),
-    new Platform(360, 410, 160, 18),
-    new Platform(600, 360, 160, 18),
+    // Ascent with staggered jumps and a side puzzle (relative to bottom)
+    new Platform(120, canvas.height - 100, 160, 18),
+    new Platform(360, canvas.height - 150, 160, 18),
+    new Platform(600, canvas.height - 200, 160, 18),
 
     // Plate ledge (activates mid-gate)
-    new Platform(340, 340, 120, 16),
+    new Platform(340, canvas.height - 220, 120, 16),
 
     // Upper path after gate
-    new Platform(520, 280, 120, 16),
-    new Platform(680, 220, 120, 16),
+    new Platform(520, canvas.height - 280, 120, 16),
+    new Platform(680, canvas.height - 340, 120, 16),
 
-    // Top ledge for exits (doors at the top next to each other)
-    new Platform(720, 170, 200, 16),
+    // Top ledge for exits (near top-right)
+    new Platform(canvas.width - 240, 170, 200, 16),
   ],
   hazards: [],
-  plates: [ new Plate(360, 324, 40, 16) ],
+  plates: [ new Plate(360, canvas.height - 236, 40, 16) ],
   doors: [],
   exits: [
-    new Exit(820, 126, 40, 44, 'red'),
-    new Exit(865, 126, 40, 44, 'blue'),
+    new Exit(canvas.width - 140, 126, 40, 44, 'red'),
+    new Exit(canvas.width - 95,  126, 40, 44, 'blue'),
   ],
-  spawns: { fireboy: {x: 80, y: 476}, watergirl: {x: 130, y: 476} },
+  spawns: { fireboy: {x: 80, y: canvas.height - 84}, watergirl: {x: 130, y: canvas.height - 84} },
   gems: [
-    new Gem(170, 430, 'red'),
-    new Gem(430, 382, 'blue'),
-    new Gem(735, 195, 'red'),
-    new Gem(885, 195, 'blue'),
+    new Gem(170, canvas.height - 130, 'red'),
+    new Gem(430, canvas.height - 178, 'blue'),
+    new Gem(canvas.width - 225, 195, 'red'),
+    new Gem(canvas.width - 75,  195, 'blue'),
   ],
   crates: [
-    new Crate(300, 494),
+    new Crate(300, canvas.height - 66),
   ]
 };
 
 // Gate that blocks the route until the plate is pressed
-const puzzleDoor = new Door(500, 300, 40, 60, '#f97316', [level.plates[0]]);
+const puzzleDoor = new Door(500, canvas.height - 300, 40, 60, '#f97316', [level.plates[0]]);
 level.doors.push(puzzleDoor);
 
 // Rising water instance (slow, tense climb)
@@ -256,7 +285,7 @@ const CHAIN = {
 // ---------------------------
 let deaths = 0;
 let levelTime = 0;
-let running = true;
+let running = false; // start only after popups
 let last = performance.now();
 
 // ---------------------------
@@ -318,31 +347,28 @@ function integratePlayer(p, dt) {
     if (aabb(p.rect(), crate)) {
       // Determine from which side player is pushing
       if (p.dx > 0) {
-        // try pushing crate to the right
         const oldX = crate.x;
         crate.x += p.dx * 0.9;
-        // If crate hits world, revert and block player
         if (crateCollidesWorld(crate)) {
           crate.x = oldX;
-          p.x = crate.x - p.w; // block player
+          p.x = crate.x - p.w;
           p.dx = 0;
         } else {
           crate.dx += p.dx * 0.5;
-          p.x = crate.x - p.w; // keep player snug
+          p.x = crate.x - p.w;
         }
       } else if (p.dx < 0) {
         const oldX = crate.x;
         crate.x += p.dx * 0.9;
         if (crateCollidesWorld(crate)) {
           crate.x = oldX;
-          p.x = crate.x + crate.w; // block player
+          p.x = crate.x + crate.w;
           p.dx = 0;
         } else {
           crate.dx += p.dx * 0.5;
           p.x = crate.x + crate.w;
         }
       } else {
-        // no horizontal input: separate minimally to closest side
         if (p.center().cx < crate.x + crate.w/2) p.x = crate.x - p.w;
         else p.x = crate.x + crate.w;
       }
@@ -367,13 +393,10 @@ function integratePlayer(p, dt) {
   for (const crate of level.crates) {
     if (aabb(p.rect(), crate)) {
       if (p.dy > 0 && p.y + p.h - crate.y <= 16) {
-        // landing on crate
         p.y = crate.y - p.h; p.dy = 0; p.onGround = true;
       } else if (p.dy < 0 && crate.y + crate.h - p.y <= 16) {
-        // bonk head on crate bottom
         p.y = crate.y + crate.h; p.dy = 0;
       } else {
-        // side overlap fallback
         if (p.center().cx < crate.x + crate.w/2) p.x = crate.x - p.w;
         else p.x = crate.x + crate.w;
         p.dx = 0;
@@ -387,27 +410,21 @@ function integratePlayer(p, dt) {
 
 // crate world collision helpers
 function crateCollidesWorld(c) {
-  // platforms
   for (const pf of level.platforms) if (aabb(c, pf)) return true;
-  // solid doors
   for (const d of level.doors) if (d.isSolid() && aabb(c, d)) return true;
-  // bounds
   if (c.x < 0 || c.x + c.w > level.width) return true;
   return false;
 }
 
 function updateCrate(crate) {
-  // gravity
   crate.dy += crate.gravity;
   crate.dy = clamp(crate.dy, -999, crate.maxFall);
 
-  // horizontal friction
   crate.dx *= 0.92;
   if (Math.abs(crate.dx) < 0.02) crate.dx = 0;
 
   // move X
   crate.x += crate.dx;
-  // collide X with world
   for (const pf of level.platforms) if (aabb(crate, pf)) {
     if (crate.dx > 0) crate.x = pf.x - crate.w;
     else if (crate.dx < 0) crate.x = pf.x + pf.w;
@@ -425,7 +442,6 @@ function updateCrate(crate) {
   crate.y += crate.dy;
   crate.onGround = false;
 
-  // collide Y with world
   for (const pf of level.platforms) if (aabb(crate, pf)) {
     if (crate.dy > 0) { crate.y = pf.y - crate.h; crate.dy = 0; crate.onGround = true; }
     else if (crate.dy < 0) { crate.y = pf.y + pf.h; crate.dy = 0; }
@@ -505,9 +521,6 @@ function checkGems(p) {
 }
 
 function allColorGemsCollected() {
-  // Both players must collect their own-color gems (optional: enforce all)
-  // Here we just check if every gem is collected for level completion bonus, but
-  // we still allow finishing without them.
   return level.gems.every(g => g.collected);
 }
 
@@ -531,7 +544,7 @@ function kill(_p) {
 
 function resetDynamicLevelObjects() {
   // Reset crate(s)
-  level.crates = [ new Crate(300, 494) ];
+  level.crates = [ new Crate(300, canvas.height - 66) ];
   // Reset gems
   level.gems.forEach(g => g.collected = false);
   fireboy.collected = 0; watergirl.collected = 0;
@@ -636,7 +649,7 @@ function tick(ts) {
 requestAnimationFrame(tick);
 
 // ---------------------------
-// UI
+// UI (Reset / Pause)
 // ---------------------------
 document.getElementById('btnReset').addEventListener('click', ()=>{
   fireboy.reset(); watergirl.reset(); levelTime=0; running=true;

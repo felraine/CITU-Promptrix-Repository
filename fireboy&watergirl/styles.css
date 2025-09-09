@@ -1,16 +1,54 @@
+/* Base */
 html, body {
   height: 100%;
+  margin: 0;
   background: #0f172a; /* slate-900 */
   overscroll-behavior: none; /* prevent arrow/WASD scrolling */
 }
 
-canvas {
-  background: #1e293b; /* slate-800 */
+/* Full-screen canvas under HUD */
+#game {
+  position: absolute;
+  top: 48px; /* HUD height approx; Tailwind bar is ~48px */
+  left: 0;
+  width: 100vw;
+  height: calc(100vh - 48px);
   display: block;
-  margin: 0 auto;
-  border-radius: 0.75rem;
+  background: #0b1220; /* deep */
 }
 
-.pixel {
-  image-rendering: pixelated;
+/* Overlays / Popups */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(2, 6, 23, 0.85); /* slate-950 w/ alpha */
+  backdrop-filter: blur(2px);
 }
+
+.popup {
+  background: #111827; /* gray-900 */
+  border: 1px solid #1f2937; /* gray-800 */
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.25rem 1rem;
+  max-width: 420px;
+  width: min(92vw, 420px);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.btn {
+  background: #334155; /* slate-700 */
+  color: #e5e7eb;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #475569;
+  cursor: pointer;
+}
+.btn:hover { background: #475569; }
+
+/* Optional pixel style */
+.pixel { image-rendering: pixelated; }

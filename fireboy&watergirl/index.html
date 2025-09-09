@@ -7,51 +7,69 @@
 
   <!-- TailwindCSS (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Our custom CSS -->
+  <!-- Custom CSS (includes full-screen canvas + overlay styles) -->
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="text-slate-100">
-  <div class="max-w-5xl mx-auto px-4 py-6">
-    <header class="flex items-center justify-between mb-3">
-      <h1 class="text-xl font-bold tracking-wide">Forest Temple — Tethered (Vanilla JS)</h1>
-      <div class="flex items-center gap-2">
+<body class="text-slate-100 select-none">
+
+  <!-- FIXED TOP HUD BAR (exact height = 48px to match JS) -->
+  <header id="hudBar" class="fixed top-0 inset-x-0 z-40 h-12 bg-slate-900/90 backdrop-blur border-b border-slate-800">
+    <div class="h-full max-w-screen-2xl mx-auto px-4 flex items-center gap-4">
+      <h1 class="font-semibold tracking-wide">Forest Temple — Tethered (Vanilla JS)</h1>
+      <div class="ml-auto flex items-center gap-4 text-sm">
+        <div class="flex items-center gap-2"><span class="text-slate-400">Level</span><span id="hudLevel" class="font-semibold">1-1</span></div>
+        <div class="flex items-center gap-2"><span class="text-slate-400">Time</span><span id="hudTime" class="font-semibold">0.0s</span></div>
+        <div class="flex items-center gap-2"><span class="text-slate-400">Deaths</span><span id="hudDeaths" class="font-semibold">0</span></div>
+        <div class="flex items-center gap-2"><span class="text-slate-400">Chain</span><span id="hudChain" class="font-semibold">0 / 0</span></div>
         <button id="btnReset" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600">Reset</button>
         <button id="btnPause" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600">Pause</button>
       </div>
-    </header>
+    </div>
+  </header>
 
-    <section class="grid md:grid-cols-[1fr_auto] gap-4 items-start">
-      <div>
-        <canvas id="game" width="960" height="560" aria-label="Game canvas"></canvas>
-        <p class="mt-2 text-sm text-slate-300">
-          🔴 Fireboy: Arrow keys (← → move, ↑ jump) &nbsp;|&nbsp; 🔵 Watergirl: WASD (A/D move, W jump)
-        </p>
-        <p class="mt-1 text-xs text-slate-400">
-          ⛓️ Tether: You’re chained together (max length shown as a line). Cooperate! Beware the rising murky water.
-        </p>
-      </div>
-      <aside class="w-full md:w-60 bg-slate-800/60 rounded-xl p-4">
-        <h2 class="font-semibold mb-2">HUD</h2>
-        <div class="space-y-2 text-sm">
-          <div class="flex justify-between"><span>Level</span><span id="hudLevel">1-1</span></div>
-          <div class="flex justify-between"><span>Time</span><span id="hudTime">0.0s</span></div>
-          <div class="flex justify-between"><span>Deaths</span><span id="hudDeaths">0</span></div>
-          <div class="flex justify-between"><span>Chain</span><span id="hudChain">0 / 0</span></div>
-        </div>
-        <hr class="my-3 border-slate-700">
-        <h3 class="font-semibold mb-1">Goal</h3>
-        <p class="text-slate-300 text-sm">
-          Get 🔴 into the red exit and 🔵 into the blue exit (both at the top). Press plates to open gates. Don’t over-stretch the chain!
-        </p>
-      </aside>
-    </section>
+  <!-- FULL-SCREEN CANVAS (height is managed by styles.css + game.js) -->
+  <main class="w-screen h-screen">
+    <canvas id="game" aria-label="Game canvas"></canvas>
+  </main>
 
-    <footer class="mt-6 text-xs text-slate-400">
-      Built with HTML5 Canvas + TailwindCSS. No frameworks.
-    </footer>
+  <!-- START SCREEN -->
+  <div id="startScreen" class="overlay">
+    <div class="popup">
+      <h2 class="text-xl font-semibold mb-2">Forest Temple — Tethered</h2>
+      <p class="text-slate-300 mb-4">Two-player puzzle platformer. You’re chained together—cooperate!</p>
+      <button id="btnStart" class="btn">Start Game</button>
+    </div>
   </div>
 
-  <!-- Our JS -->
+  <!-- CONTROLS POPUP -->
+  <div id="controlsPopup" class="overlay" style="display:none">
+    <div class="popup">
+      <h2 class="text-lg font-semibold mb-3">Controls</h2>
+      <div class="text-slate-200 text-left space-y-2 mb-4">
+        <p>🔴 <strong>Fireboy</strong>: <kbd>←</kbd> <kbd>→</kbd> move, <kbd>↑</kbd> jump</p>
+        <p>🔵 <strong>Watergirl</strong>: <kbd>A</kbd> <kbd>D</kbd> move, <kbd>W</kbd> jump</p>
+        <p>⏸ <strong>Pause</strong>: Top-bar button</p>
+        <p>🔁 <strong>Reset</strong>: Top-bar button</p>
+      </div>
+      <button id="btnControlsNext" class="btn">Next</button>
+    </div>
+  </div>
+
+  <!-- GOAL POPUP -->
+  <div id="goalPopup" class="overlay" style="display:none">
+    <div class="popup">
+      <h2 class="text-lg font-semibold mb-3">Goal</h2>
+      <div class="text-slate-200 text-left space-y-2 mb-4">
+        <p>• Get 🔴 to the <strong>red exit</strong> and 🔵 to the <strong>blue exit</strong>.</p>
+        <p>• Press plates to open gates.</p>
+        <p>• Don’t over-stretch the chain.</p>
+        <p>• Beware the rising murky water.</p>
+      </div>
+      <button id="btnGoalStart" class="btn">Let’s Go!</button>
+    </div>
+  </div>
+
+  <!-- Game JS -->
   <script src="game.js"></script>
 </body>
 </html>
