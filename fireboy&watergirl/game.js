@@ -1,81 +1,49 @@
 // ---------------------------
-// Setup (Full-screen + Popups flow)
+// Setup (Uniform game box + Popups flow)
 // ---------------------------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-
-// Size canvas: full-screen under a ~48px HUD bar
-function sizeCanvas() {
-  const HUD_HEIGHT = 48; // keep in sync with your CSS/top bar height
-  canvas.width = window.innerWidth;
-  canvas.height = Math.max(240, window.innerHeight - HUD_HEIGHT);
-}
-sizeCanvas();
-window.addEventListener('resize', sizeCanvas);
+const gameBox = document.getElementById('gameBox');
+const deathPopup   = document.getElementById('deathPopup');
 
 // HUD references (top bar)
 const HUD = {
   level: document.getElementById('hudLevel'),
   time: document.getElementById('hudTime'),
   deaths: document.getElementById('hudDeaths'),
-  chain: document.getElementById('hudChain'),
 };
-
-// ---------------------------
-// Background Music 
-// ---------------------------
-const bgMusic = new Audio("assets/bg_music.mp3"); 
-bgMusic.loop = true;
-bgMusic.volume = 0.5; // range: 0.0 (mute) → 1.0 (full)
-
-// helper function to start music safely
-function startMusic() {
-  if (bgMusic.paused) {
-    bgMusic.play().catch(err => {
-      console.log("Autoplay blocked until user interacts:", err);
-    });
-  }
-}
-
-// bind music start to any game-start events
-document.addEventListener("click", startMusic, { once: true });
-document.addEventListener("keydown", startMusic, { once: true });
-
-// optional pause/resume controls
-function pauseMusic() {
-  if (!bgMusic.paused) bgMusic.pause();
-}
-function resumeMusic() {
-  if (bgMusic.paused) startMusic();
-}
-// Music Credits: pixabay
-
 
 // Start flow popups
 const startScreen   = document.getElementById('startScreen');
 const controlsPopup = document.getElementById('controlsPopup');
 const goalPopup     = document.getElementById('goalPopup');
 
-document.getElementById('btnStart')?.addEventListener('click', () => {
-  startScreen.style.display = 'none';
-  controlsPopup.style.display = 'flex';
-});
-document.getElementById('btnControlsNext')?.addEventListener('click', () => {
-  controlsPopup.style.display = 'none';
-  goalPopup.style.display = 'flex';
-});
-document.getElementById('btnGoalStart')?.addEventListener('click', () => {
-  goalPopup.style.display = 'none';
-  running = true;
-});
-
-// Keyboard
+// Safe key handling (avoid page scroll)
 const keys = {};
 addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (['arrowup','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
 }, { passive: false });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// Canvas size to the game box
+function sizeCanvas() {
+  const rect = gameBox?.getBoundingClientRect?.();
+  if (rect) {
+    canvas.width  = Math.max(320, Math.floor(rect.width));
+    canvas.height = Math.max(180, Math.floor(rect.height));
+  } else {
+    // Fallback in case markup changes
+    const HUD_HEIGHT = 48;
+    canvas.width = window.innerWidth;
+    canvas.height = Math.max(240, window.innerHeight - HUD_HEIGHT);
+  }
+}
+sizeCanvas();
+window.addEventListener('resize', () => {
+  sizeCanvas();
+  rebuildLevel(); // rebuild layout on resize for responsive uniformity
+});
 
 // helpers
 function aabb(a, b) {
@@ -124,8 +92,16 @@ class Player {
 }
 
 class Platform {
-  constructor(x,y,w,h) { this.x=x; this.y=y; this.w=w; this.h=h; }
-  draw() { ctx.fillStyle = '#7b9704'; ctx.fillRect(this.x,this.y,this.w,this.h); }
+  constructor(x, y, w, h, colorTag = null) {
+    this.x = x; this.y = y; this.w = w; this.h = h;
+    this.colorTag = colorTag; // 'red', 'blue', or null
+  }
+  draw() {
+    if (this.colorTag === 'red') ctx.fillStyle = '#b91c1c';
+    else if (this.colorTag === 'blue') ctx.fillStyle = '#1d4ed8';
+    else ctx.fillStyle = '#7b9704';
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+  }
 }
 
 class Hazard {
@@ -257,115 +233,115 @@ class Rat {
 }
 
 // ---------------------------
-// Level Definition (shaped to your mock)
+// Level Definition (relative to canvas for uniformity)
 // ---------------------------
-const h = canvas.height;
-const w = canvas.width;
+let level; // will be (re)built based on canvas size
 
-// y positions for lanes
-const TOP_Y   = 350;
-const MID_Y   = h - 200;
-const FLOOR_Y = h - 40;
+function buildLevel() {
+  const w = canvas.width;
+  const h = canvas.height;
 
-// right vertical pillar that connects up to exits
-const PILLAR_W = 120;
-const pillar = new Platform(w - 120, h - 150, PILLAR_W, 180);
+  // y positions for lanes (relative)
+  const TOP_Y   = Math.floor(h * 0.38);
+  const MID_Y   = Math.floor(h * 0.60);
+  const FLOOR_H = Math.floor(h * 0.08);
+  const FLOOR_Y = h - FLOOR_H;
 
-const level = {
-  id: '1-1',
-  width: w,
-  height: h,
-  gravity: 0.48,
-  platforms: [
-    // Bottom solid block (floor)
-    new Platform(0, FLOOR_Y, w - 0, 40),
+  // right vertical pillar that connects up to exits
+  const PILLAR_W = Math.floor(w * 0.12);
+  const pillar = new Platform(w - PILLAR_W, h - Math.floor(h * 0.30), PILLAR_W, Math.floor(h * 0.28));
 
-    // Middle long platform (boy)
-    new Platform(0, MID_Y, w - 250, 22),
+  level = {
+    id: '1-1',
+    width: w,
+    height: h,
+    gravity: 0.48,
+    platforms: [
+      // Bottom solid block (floor)
+      new Platform(0, FLOOR_Y, w, FLOOR_H),
 
-    // Two small blocks on mid platform (to mark "boy can walk" zone)
-    new Platform(w/2 - 100, MID_Y - 22, 60, 22),
-    new Platform(w/2 + 60,  MID_Y - 22, 60, 22),
+      // Middle long platform
+      new Platform(0, MID_Y, Math.floor(w * 0.80), Math.floor(h * 0.075)),
 
-    // Top long platform (girl), leaving gap on far right for pillar/exit
-    new Platform(80, TOP_Y, w - PILLAR_W - 60, 22),
+      new Platform(Math.floor(w*0.48), MID_Y - Math.floor(h*0.020), Math.floor(w*0.05), Math.floor(h*0.028), 'red'),
+      new Platform(Math.floor(w*0.56), MID_Y - Math.floor(h*0.028), Math.floor(w*0.05), Math.floor(h*0.028), 'blue'),
 
-    // Right vertical pillar rising up (to top/exit)
-    pillar,
+      // Top long platform (leave gap on far right for pillar/exit)
+      new Platform(Math.floor(w*0.06), TOP_Y, w - PILLAR_W - Math.floor(w*0.05), Math.floor(h * 0.028)),
 
-    // Tiny step just under the exits (visual)
-    new Platform(w - 180, TOP_Y - 40, 180, 40),
-  ],
-  hazards: [],
-  // Pressure plates: one on top-left, one on mid-left
-  plates: [
-    new Plate(140, TOP_Y - 6, 50, 6),
-    new Plate(220, MID_Y - 6, 50, 6),
-  ],
-  doors: [],
-  // Two exits at top-right sitting on the pillar cap
-  exits: [
-    new Exit(w - 120, TOP_Y - 14, 40, 44, 'red'),
-    new Exit(w - 70,  TOP_Y - 14, 40, 44, 'blue'),
-  ],
-  // Spawns at bottom-left
-  spawns: { fireboy: {x: 40, y: FLOOR_Y - 44}, watergirl: {x: 90, y: FLOOR_Y - 44} },
+      // Right vertical pillar rising up (to top/exit)
+      pillar,
 
-  // Gems: top-left blue, top-mid red; mid-air cyan (we use blue gem sprite),
-  // two bottom gems (red & blue) near mid-right; one more red mid-left
-  gems: [
-    new Gem(150, TOP_Y - 40, 'blue'),           // top-left (blue)
-    new Gem(w/2 - 20, TOP_Y - 60, 'red'),       // top-mid (red)
-    new Gem(w/2 + 10, MID_Y - 60, 'blue'),      // mid-air cyan spot
-    new Gem(300, MID_Y - 50, 'red'),            // mid-left (red)
-    new Gem(w - 360, FLOOR_Y - 70, 'blue'),     // low blue
-    new Gem(w - 320, FLOOR_Y - 70, 'red'),      // low red
-  ],
+      // Tiny step just under the exits (visual)
+      new Platform(w - Math.floor(w * 0.14), TOP_Y - Math.floor(h * 0.045), Math.floor(w * 0.14), Math.floor(h * 0.045)),
+    ],
+    hazards: [],
 
-  // Crate on top lane near the right before the exits
-  crates: [
-    new Crate(w - PILLAR_W - 120, TOP_Y - 26),
-  ],
+    // Pressure plates
+    plates: [
+      new Plate(Math.floor(w*0.12), TOP_Y - 6, Math.floor(w*0.05), 6),
+      new Plate(Math.floor(w*0.17), MID_Y - 6, Math.floor(w*0.05), 6),
+    ],
+    doors: [],
+    // Exits
+    exits: [
+      new Exit(w - PILLAR_W, TOP_Y - Math.floor(h*0.03), 40, 44, 'red'),
+      new Exit(w - Math.floor(PILLAR_W*0.6), TOP_Y - Math.floor(h*0.03), 40, 44, 'blue'),
+    ],
+    // Spawns
+    spawns: { fireboy: {x: Math.floor(w*0.05), y: FLOOR_Y - 44}, watergirl: {x: Math.floor(w*0.10), y: FLOOR_Y - 44} },
 
-  // Rats: one on top lane, one on bottom floor
-  rats: [
-    new Rat(w/2 + 60, TOP_Y - 16, w/2 + 20, w - PILLAR_W - 40, 1.1),
-    new Rat(w/2 - 80, FLOOR_Y - 16, w/2 - 120, w/2 + 80, 1.0),
-  ],
-};
+    // Gems (unchanged)
+    gems: [
+      new Gem(Math.floor(w*0.14), TOP_Y - 40, 'blue'),
+      new Gem(Math.floor(w*0.50), TOP_Y - 60, 'red'),
+      new Gem(Math.floor(w*0.52), MID_Y - 60, 'blue'),
+      new Gem(Math.floor(w*0.24), MID_Y - 50, 'red'),
+      new Gem(Math.floor(w*0.68), h - FLOOR_H - 70, 'blue'),
+      new Gem(Math.floor(w*0.71), h - FLOOR_H - 70, 'red'),
+    ],
 
-// Gates opened by plates (small blockers on each lane)
-const topGate = new Door(w/2 + 10, TOP_Y - 30, 18, 30, '#5f7700', [level.plates[0]]);
-const midGate = new Door(w/2 - 30, MID_Y - 30, 18, 30, '#5f7700', [level.plates[1]]);
-level.doors.push(topGate, midGate);
+    // Crates: top lane + bottom-right (your circled spot)
+    crates: [
+      new Crate(w - PILLAR_W - Math.floor(w*0.09), TOP_Y - 26),
+      new Crate(Math.floor(w*0.66), FLOOR_Y - 26),
+    ],
+
+    // Rats
+    rats: [
+      new Rat(Math.floor(w*0.55), TOP_Y - 16, Math.floor(w*0.52), w - PILLAR_W - Math.floor(w*0.05), 1.1),
+      new Rat(Math.floor(w*0.40), FLOOR_Y - 16, Math.floor(w*0.36), Math.floor(w*0.52), 1.0),
+    ],
+
+    constants: { TOP_Y, MID_Y, FLOOR_Y, FLOOR_H, PILLAR_W },
+  };
+
+  // Gates opened by plates (small blockers on each lane)
+  const topGate = new Door(Math.floor(w*0.52), TOP_Y - 30, 18, 30, '#5f7700', [level.plates[0]]);
+  const midGate = new Door(Math.floor(w*0.47), MID_Y - 30, 18, 30, '#5f7700', [level.plates[1]]);
+  level.doors.push(topGate, midGate);
+}
+
+buildLevel();
 
 // Rising water
 const risingWater = new RisingWater(0.05);
 
 // ---------------------------
-// Players
+// Players (no tether)
 // ---------------------------
-const fireboy = new Player({
+let fireboy = new Player({
   x: level.spawns.fireboy.x, y: level.spawns.fireboy.y,
   color: 'red',
   controls: { left: 'arrowleft', right: 'arrowright', jump: 'arrowup' },
   immune: { fire: true, water: false }
 });
-const watergirl = new Player({
+let watergirl = new Player({
   x: level.spawns.watergirl.x, y: level.spawns.watergirl.y,
   color: 'blue',
   controls: { left: 'a', right: 'd', jump: 'w' },
   immune: { fire: false, water: true }
 });
-
-// ---------------------------
-// Chain (Tether) Config
-// ---------------------------
-const CHAIN = {
-  maxLength: 160,
-  stiffness: 0.5,
-  allowSnapDeath: false,
-};
 
 // ---------------------------
 // Game State
@@ -416,11 +392,14 @@ function integratePlayer(p, dt) {
   // horizontal
   p.x += p.dx;
 
-  // collide X with platforms and doors
-  for (const pf of level.platforms) if (aabb(p.rect(), pf)) {
-    if (p.dx > 0) p.x = pf.x - p.w;
-    else if (p.dx < 0) p.x = pf.x + pf.w;
-    p.dx = 0;
+  // collide X with platforms (respect color) and doors
+  for (const pf of level.platforms) {
+    if (pf.forColor && pf.forColor !== p.color) continue; // <-- color lock
+    if (aabb(p.rect(), pf)) {
+      if (p.dx > 0) p.x = pf.x - p.w;
+      else if (p.dx < 0) p.x = pf.x + pf.w;
+      p.dx = 0;
+    }
   }
   for (const d of level.doors) if (d.isSolid() && aabb(p.rect(), d)) {
     if (p.dx > 0) p.x = d.x - p.w;
@@ -460,14 +439,21 @@ function integratePlayer(p, dt) {
     }
   }
 
+  // world X bounds
+  if (p.x < 0) { p.x = 0; p.dx = 0; }
+  if (p.x + p.w > level.width) { p.x = level.width - p.w; p.dx = 0; }
+
   // vertical
   p.y += p.dy;
   p.onGround = false;
 
-  // collide Y with platforms and doors
-  for (const pf of level.platforms) if (aabb(p.rect(), pf)) {
-    if (p.dy > 0) { p.y = pf.y - p.h; p.dy = 0; p.onGround = true; }
-    else if (p.dy < 0) { p.y = pf.y + pf.h; p.dy = 0; }
+  // collide Y with platforms (respect color) and doors
+  for (const pf of level.platforms) {
+    if (pf.forColor && pf.forColor !== p.color) continue; // <-- color lock
+    if (aabb(p.rect(), pf)) {
+      if (p.dy > 0) { p.y = pf.y - p.h; p.dy = 0; p.onGround = true; }
+      else if (p.dy < 0) { p.y = pf.y + pf.h; p.dy = 0; }
+    }
   }
   for (const d of level.doors) if (d.isSolid() && aabb(p.rect(), d)) {
     if (p.dy > 0) { p.y = d.y - p.h; p.dy = 0; p.onGround = true; }
@@ -489,7 +475,7 @@ function integratePlayer(p, dt) {
     }
   }
 
-  // fell off world
+  // fell far below world (safety)
   if (p.y > level.height + 200) kill(p);
 }
 
@@ -502,7 +488,7 @@ function crateCollidesWorld(c) {
 }
 
 function updateCrate(crate) {
-  crate.dy += crate.gravity;
+  crate.dy += 0.48;
   crate.dy = clamp(crate.dy, -999, crate.maxFall);
 
   crate.dx *= 0.92;
@@ -538,57 +524,12 @@ function updateCrate(crate) {
 }
 
 // ---------------------------
-// Tether mechanics
-// ---------------------------
-function currentChainLength() {
-  const c1 = fireboy.center(), c2 = watergirl.center();
-  const dx = c2.cx - c1.cx, dy = c2.cy - c1.cy;
-  return Math.hypot(dx, dy);
-}
-function applyChainConstraint(p1, p2) {
-  const c1 = p1.center(), c2 = p2.center();
-  let dx = c2.cx - c1.cx, dy = c2.cy - c1.cy;
-  let dist = Math.hypot(dx, dy);
-  if (dist === 0 || dist <= CHAIN.maxLength) return;
-
-  if (CHAIN.allowSnapDeath) { kill(p1); kill(p2); return; }
-
-  const excess = dist - CHAIN.maxLength;
-  const nx = dx / dist, ny = dy / dist;
-  const adjust = excess * CHAIN.stiffness;
-
-  // Move both symmetrically
-  p1.x += nx * adjust * 0.5; p1.y += ny * adjust * 0.5;
-  p2.x -= nx * adjust * 0.5; p2.y -= ny * adjust * 0.5;
-
-  resolveGround(p1);
-  resolveGround(p2);
-}
-function resolveGround(p) {
-  p.onGround = false;
-  for (const pf of level.platforms) if (aabb(p.rect(), pf)) {
-    if (p.dy >= 0 && p.y + p.h > pf.y && p.y < pf.y) {
-      p.y = pf.y - p.h; p.dy = 0; p.onGround = true;
-    }
-  }
-  for (const d of level.doors) if (aabb(p.rect(), d) && d.isSolid()) {
-    if (p.dy >= 0 && p.y + p.h > d.y && p.y < d.y) {
-      p.y = d.y - p.h; p.dy = 0; p.onGround = true;
-    }
-  }
-}
-
-// ---------------------------
 // Hazards, Gems & Goals
 // ---------------------------
 function checkHazards(p) {
-  // rats
   for (const r of level.rats) if (aabb(p.rect(), r.rect())) { kill(p); return; }
-  // rising water
   if (risingWater.collides(p)) kill(p);
-  // other hazards if you add later
 }
-
 function checkGems(p) {
   for (const gem of level.gems) {
     if (!gem.collected && aabb(p.rect(), gem)) {
@@ -600,10 +541,7 @@ function checkGems(p) {
     }
   }
 }
-
-function allColorGemsCollected() {
-  return level.gems.every(g => g.collected);
-}
+function allColorGemsCollected() { return level.gems.every(g => g.collected); }
 
 function updatePlates() {
   for (const pl of level.plates) {
@@ -617,28 +555,30 @@ function updateDoors() { for (const d of level.doors) d.update(); }
 
 function kill(_p) {
   deaths++; HUD.deaths.textContent = deaths;
-  fireboy.reset(); watergirl.reset();
-  levelTime = 0;
-  risingWater.level = canvas.height;
-  resetDynamicLevelObjects();
-  resetRats();
+  running = false;
+  deathPopup.style.display = 'flex';   // show restart popup
 }
 
 function resetDynamicLevelObjects() {
-  // Reset crate
-  level.crates = [ new Crate(w - PILLAR_W - 120, TOP_Y - 26) ];
+  const { TOP_Y, PILLAR_W, FLOOR_Y } = level.constants;
+
+  // Reset crates (top lane + bottom-right)
+  level.crates = [
+    new Crate(level.width - PILLAR_W - Math.floor(level.width*0.09), TOP_Y - 26),
+    new Crate(Math.floor(level.width*0.66), FLOOR_Y - 26),
+  ];
+
   // Reset gems
   level.gems.forEach(g => g.collected = false);
   fireboy.collected = 0; watergirl.collected = 0;
 }
-
 function resetRats() {
+  const { TOP_Y, FLOOR_Y, PILLAR_W } = level.constants;
   level.rats = [
-    new Rat(w/2 + 60, TOP_Y - 16, w/2 + 20, w - PILLAR_W - 40, 1.1),
-    new Rat(w/2 - 80, FLOOR_Y - 16, w/2 - 120, w/2 + 80, 1.0),
+    new Rat(Math.floor(level.width*0.55), TOP_Y - 16, Math.floor(level.width*0.52), level.width - PILLAR_W - Math.floor(level.width*0.05), 1.1),
+    new Rat(Math.floor(level.width*0.40), FLOOR_Y - 16, Math.floor(level.width*0.36), Math.floor(level.width*0.52), 1.0),
   ];
 }
-
 function bothAtExits() {
   const redExit = level.exits.find(e => e.forColor==='red');
   const blueExit = level.exits.find(e => e.forColor==='blue');
@@ -648,24 +588,10 @@ function bothAtExits() {
 // ---------------------------
 // Render
 // ---------------------------
-function drawChain() {
-  const f = fireboy.center(), w2 = watergirl.center();
-  const dist = Math.min(currentChainLength(), CHAIN.maxLength);
-  const t = dist / CHAIN.maxLength; // 0..1
-  const color = t < 0.66 ? '#d1d5db' : (t < 0.9 ? '#f59e0b' : '#ef4444');
-
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(f.cx, f.cy);
-  ctx.lineTo(w2.cx, w2.cy);
-  ctx.stroke();
-}
-
 function draw() {
   // bg
   ctx.fillStyle = '#121a0f';
-  ctx.fillRect(0,0,w,h);
+  ctx.fillRect(0,0,level.width,level.height);
 
   // world
   level.platforms.forEach(p=>p.draw());
@@ -682,9 +608,6 @@ function draw() {
   // rats
   level.rats.forEach(r => r.draw());
 
-  // chain
-  drawChain();
-
   // players
   ctx.fillStyle = '#ef4444'; ctx.fillRect(fireboy.x, fireboy.y, fireboy.w, fireboy.h);
   ctx.fillStyle = '#14b8ff'; ctx.fillRect(watergirl.x, watergirl.y, watergirl.w, watergirl.h);
@@ -692,7 +615,7 @@ function draw() {
   // rising water (on top so it covers)
   risingWater.draw();
 
-  // HUD gems
+  // HUD extra (gems)
   ctx.fillStyle = '#e5e7eb';
   ctx.font = '12px sans-serif';
   ctx.fillText(`🔴 ${fireboy.collected} | 🔵 ${watergirl.collected}  (Total: ${level.gems.filter(g=>g.collected).length}/${level.gems.length})`, 10, 16);
@@ -715,9 +638,6 @@ function tick(ts) {
     // crate physics after possible push
     level.crates.forEach(updateCrate);
 
-    // tether after integrating both
-    applyChainConstraint(fireboy, watergirl);
-
     // interactions
     checkGems(fireboy); checkGems(watergirl);
     checkHazards(fireboy); checkHazards(watergirl);
@@ -730,23 +650,35 @@ function tick(ts) {
     risingWater.update();
   }
 
-  HUD.chain.textContent = `${Math.round(currentChainLength())} / ${CHAIN.maxLength}`;
   draw();
 
   if (bothAtExits()) {
     running=false;
-    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,level.width,level.height);
     ctx.fillStyle='#f8fafc'; ctx.font='bold 28px sans-serif';
     const bonus = allColorGemsCollected() ? ' + Gem Master!' : '';
-    ctx.fillText('Level Complete!' + bonus, w/2-140, h/2);
+    ctx.fillText('Level Complete!' + bonus, level.width/2-140, level.height/2);
   }
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
 // ---------------------------
-// UI (Reset / Pause)
+// UI (Start flow / Reset / Pause / Restart)
 // ---------------------------
+document.getElementById('btnStart')?.addEventListener('click', () => {
+  startScreen.style.display = 'none';
+  controlsPopup.style.display = 'flex';
+});
+document.getElementById('btnControlsNext')?.addEventListener('click', () => {
+  controlsPopup.style.display = 'none';
+  goalPopup.style.display = 'flex';
+});
+document.getElementById('btnGoalStart')?.addEventListener('click', () => {
+  goalPopup.style.display = 'none';
+  running = true;
+});
+
 document.getElementById('btnReset').addEventListener('click', ()=>{
   fireboy.reset(); watergirl.reset(); levelTime=0; running=true;
   risingWater.level = canvas.height;
@@ -756,3 +688,46 @@ document.getElementById('btnReset').addEventListener('click', ()=>{
 document.getElementById('btnPause').addEventListener('click', (e)=>{
   running=!running; e.currentTarget.textContent=running?'Pause':'Resume';
 });
+document.getElementById('btnRestart')?.addEventListener('click', () => {
+  deathPopup.style.display = 'none';
+  fireboy.reset();
+  watergirl.reset();
+  levelTime = 0;
+  risingWater.level = canvas.height;
+  resetDynamicLevelObjects();  // recreates the crates
+  resetRats();
+  running = true;
+});
+
+// ---------------------------
+// Rebuild level on resize
+// ---------------------------
+function rebuildLevel() {
+  // Remember gem counts & deaths but reset dynamic state
+  const wasRunning = running;
+  running = false;
+
+  // Rebuild layout
+  buildLevel();
+
+  // Recreate players at new spawns (no tether)
+  fireboy = new Player({
+    x: level.spawns.fireboy.x, y: level.spawns.fireboy.y,
+    color: 'red',
+    controls: { left: 'arrowleft', right: 'arrowright', jump: 'arrowup' },
+    immune: { fire: true, water: false }
+  });
+  watergirl = new Player({
+    x: level.spawns.watergirl.x, y: level.spawns.watergirl.y,
+    color: 'blue',
+    controls: { left: 'a', right: 'd', jump: 'w' },
+    immune: { fire: false, water: true }
+  });
+
+  // Reset water & dynamic objects
+  risingWater.level = canvas.height;
+  resetDynamicLevelObjects();
+  resetRats();
+
+  running = wasRunning;
+}
