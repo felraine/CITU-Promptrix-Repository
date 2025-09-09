@@ -12,6 +12,33 @@ ratImg.src = './assets/rat.png';
 ratImg.onload  = () => console.log('rat.png loaded');
 ratImg.onerror = (e) => console.warn('Failed to load rat.png at', ratImg.src, e);
 
+// ---------------------------
+// Background Music
+// ---------------------------
+const bgMusic = new Audio("assets/bg_music.mp3"); // place your music file in the same folder
+bgMusic.loop = true;
+bgMusic.volume = 0.5; // range: 0.0 (mute) → 1.0 (full)
+
+// helper function to start music safely
+function startMusic() {
+  if (bgMusic.paused) {
+    bgMusic.play().catch(err => {
+      console.log("Autoplay blocked until user interacts:", err);
+    });
+  }
+}
+
+// bind music start to any game-start events
+document.addEventListener("click", startMusic, { once: true });
+document.addEventListener("keydown", startMusic, { once: true });
+
+// optional pause/resume controls
+function pauseMusic() {
+  if (!bgMusic.paused) bgMusic.pause();
+}
+function resumeMusic() {
+  if (bgMusic.paused) startMusic();
+}
 
 // HUD references (top bar)
 const HUD = {
