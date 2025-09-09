@@ -337,7 +337,7 @@ function buildLevel() {
   const h = canvas.height;
 
   // y positions for lanes (relative)
-  const TOP_Y   = Math.floor(h * 0.38);
+  const TOP_Y   = Math.floor(h * 0.30);
   const MID_Y   = Math.floor(h * 0.60);
   const FLOOR_H = Math.floor(h * 0.08);
   const FLOOR_Y = h - FLOOR_H;
